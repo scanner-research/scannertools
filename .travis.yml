@@ -2,7 +2,7 @@ language: python
 sudo: false
 
 install:
-  - pip install --user travis-sphinx
+  - pip install travis-sphinx
 
 script:
   - travis-sphinx build -s doc
