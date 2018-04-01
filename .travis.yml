@@ -1,0 +1,10 @@
+language: python
+
+install:
+  - pip install travis-sphinx
+
+script:
+  - travis-sphinx build -s doc
+
+after_success:
+  - travis-sphinx deploy
