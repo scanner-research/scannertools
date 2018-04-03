@@ -1,20 +1,12 @@
 import pytest
 import tixelbox as tb
-import tempfile
-import requests
 import os
 
 
 @pytest.fixture(scope='module')
 def video():
-    url = "https://storage.googleapis.com/scanner-data/test/short_video.mp4"
-    with tempfile.NamedTemporaryFile(suffix='.mp4') as f:
-        resp = requests.get(url, stream=True)
-        assert resp.ok
-        for block in resp.iter_content(1024):
-            f.write(block)
-        f.flush()
-        yield tb.Video(f.name)
+    with tb.sample_video() as video:
+        yield video
 
 
 @pytest.fixture(scope='module')

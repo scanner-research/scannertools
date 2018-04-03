@@ -6,9 +6,32 @@ import storehouse
 import tempfile
 import subprocess as sp
 import os
+import requests
+from contextlib import contextmanager
+import logging
+import datetime
 
 STORAGE = None
-LOCAL_STORAGE = True
+LOCAL_STORAGE = None
+
+log = logging.getLogger('tixelbox')
+log.setLevel(logging.DEBUG)
+if not log.handlers:
+
+    class CustomFormatter(logging.Formatter):
+        def format(self, record):
+            level = record.levelname[0]
+            time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')[2:]
+            if len(record.args) > 0:
+                record.msg = '({})'.format(', '.join(
+                    [str(x) for x in [record.msg] + list(record.args)]))
+                record.args = ()
+            return '{level} {time} {filename}:{lineno:03d}] {msg}'.format(
+                level=level, time=time, **record.__dict__)
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(CustomFormatter())
+    log.addHandler(handler)
 
 
 def init_storage(bucket=None):
@@ -28,6 +51,10 @@ def get_storage():
     if STORAGE is None:
         init_storage()
     return STORAGE
+
+
+def get_scanner_db():
+    return scannerpy.Database()
 
 
 def ffmpeg_fmt_time(t):
@@ -60,6 +87,29 @@ def ffmpeg_extract(input_path, output_ext=None, output_path=None, segment=None):
         stderr=fnull)
 
     return output_path
+
+
+@contextmanager
+def sample_video(delete=True):
+    url = "https://storage.googleapis.com/scanner-data/test/short_video.mp4"
+
+    if delete:
+        f = tempfile.NamedTemporaryFile(suffix='.mp4')
+    else:
+        sample_path = '/tmp/sample_video.mp4'
+        if os.path.isfile(sample_path):
+            yield Video(sample_path)
+            return
+
+        f = open(sample_path, 'wb')
+
+    with f as f:
+        resp = requests.get(url, stream=True)
+        assert resp.ok
+        for block in resp.iter_content(1024):
+            f.write(block)
+        f.flush()
+        yield Video(f.name)
 
 
 class Video:
@@ -95,6 +145,17 @@ class Video:
 
     def path(self):
         return self._path
+
+    def scanner_name(self):
+        return self.path()
+
+    def add_to_scanner(self, db):
+        table = self.scanner_name()
+        if not db.has_table(table):
+            db.ingest_videos([(table, self.path())], inplace=True)
+
+    def scanner_table(self, db):
+        return db.table(self.scanner_name())
 
 
 class Audio:
