@@ -14,7 +14,8 @@ DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
 LABEL_URL = 'https://storage.googleapis.com/scanner-data/public/mscoco_label_map.pbtxt'
 
 
-def detect_objects(video, frames=None, cache=False, nms_threshold=None):
+@autobatch(uniforms=['nms_threshold'])
+def detect_objects(videos, frames=None, nms_threshold=None):
     if not os.path.isdir(os.path.join(temp_directory(), MODEL_NAME)):
         log.debug('Downloading model')
         model_tar_path = download_temp_file(DOWNLOAD_BASE + MODEL_FILE)
@@ -25,75 +26,74 @@ def detect_objects(video, frames=None, cache=False, nms_threshold=None):
     log.debug('Connecting to scanner')
     with get_scanner_db() as db:
         log.debug('Ingesting video')
-        video.add_to_scanner(db)
+        scanner_ingest(db, videos)
 
-        bbox_output_name = video.scanner_name() + '_objdet'
-        if not db.has_table(bbox_output_name) or not cache:
-            log.debug('Registering kernel')
+        log.debug('Registering kernel')
+        try:
+            db.register_op('ObjDetect', [('frame', ColumnType.Video)], ['bboxes'])
+            db.register_python_kernel('ObjDetect', DeviceType.CPU,
+                                      SCRIPT_DIR + '/kernels/obj_detect_kernel.py')
+        except ScannerException:
+            pass
 
-            try:
-                db.register_op('ObjDetect', [('frame', ColumnType.Video)], ['bboxes'])
-                db.register_python_kernel('ObjDetect', DeviceType.CPU,
-                                          SCRIPT_DIR + '/obj_detect_kernel.py')
-            except ScannerException:
-                pass
+        try:
+            db.register_op('BboxNMS', ['bboxes'], ['bboxes'])
+            db.register_python_kernel('BboxNMS', DeviceType.CPU,
+                                      SCRIPT_DIR + '/kernels/bbox_nms_kernel.py')
+        except ScannerException:
+            pass
 
-            try:
-                db.register_op('BboxNMS', ['bboxes'], ['bboxes'])
-                db.register_python_kernel('BboxNMS', DeviceType.CPU,
-                                          SCRIPT_DIR + '/bbox_nms_kernel.py')
-            except ScannerException:
-                pass
+        frame = db.sources.FrameColumn()
+        frame_sampled = frame.sample()
+        bboxes = db.ops.ObjDetect(frame=frame_sampled)
+        outputs = {'bboxes': bboxes}
 
-            frame = db.sources.FrameColumn()
-            frame_sampled = frame.sample()
-            bboxes = db.ops.ObjDetect(frame=frame_sampled)
-            outputs = {'bboxes': bboxes}
+        if nms_threshold is not None:
+            outputs['nmsed_bboxes'] = db.ops.BboxNMS(bboxes=bboxes, threshold=nms_threshold)
 
-            if nms_threshold is not None:
-                outputs['nmsed_bboxes'] = db.ops.BboxNMS(bboxes=bboxes, threshold=nms_threshold)
+        output = db.sinks.Column(columns=outputs)
 
-            output = db.sinks.Column(columns=outputs)
-
-            log.debug('Running job')
-            job = Job(
+        jobs = [
+            Job(
                 op_args={
-                    frame:
-                    video.scanner_table(db).column('frame'),
-                    frame_sampled:
-                    db.sampler.gather(frames) if frames is not None else db.sampler.all(),
-                    output:
-                    bbox_output_name
-                })
-            db.run(BulkJob(output=output, jobs=[job]), force=True, pipeline_instances_per_node=1)
+                    frame: db.table(v.scanner_name()).column('frame'),
+                    frame_sampled: db.sampler.gather(f) if f is not None else db.sampler.all(),
+                    output: v.scanner_name() + '_objdet'
+                }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
+        ]
 
-        output_table = db.table(bbox_output_name)
-        all_bboxes = [
+        log.debug('Running job')
+        output_tables = db.run(output, jobs, force=True)
+
+        all_bboxes = [[
             pickle.loads(box)
             for box in output_table.column('nmsed_bboxes'
                                            if nms_threshold is not None else 'bboxes').load()
-        ]
+        ] for output_table in output_tables]
 
     return all_bboxes
 
 
-def draw_bboxes(video, bboxes, frames=None, path=None):
+@autobatch()
+def draw_bboxes(videos, bboxes, frames=None, path=None):
     log.debug('Connecting to scanner')
     with get_scanner_db() as db:
         log.debug('Ingesting video')
-        video.add_to_scanner(db)
+        scanner_ingest(db, videps)
 
         try:
             db.register_op('BboxDraw', [('frame', ColumnType.Video), 'bboxes'],
                            [('frame', ColumnType.Video)])
             db.register_python_kernel('BboxDraw', DeviceType.CPU,
-                                      SCRIPT_DIR + '/bbox_draw_kernel.py')
+                                      SCRIPT_DIR + '/kernels/bbox_draw_kernel.py')
         except ScannerException:
             pass
 
-        bbox_output_name = video.scanner_name() + '_bboxes_draw'
-        db.new_table(
-            bbox_output_name, ['bboxes'], [[pickle.dumps(bb)] for bb in bboxes], force=True)
+        for vid_bboxes in bboxes:
+            db.new_table(
+                video.scanner_name() + '_bboxes_draw', ['bboxes'],
+                [[pickle.dumps(bb)] for bb in vid_bboxes],
+                force=True)
 
         frame = db.sources.FrameColumn()
         frame_sampled = frame.sample()
@@ -102,15 +102,16 @@ def draw_bboxes(video, bboxes, frames=None, path=None):
         output = db.sinks.Column(columns={'frame': frame_drawn})
 
         log.debug('Running job')
-        job = Job(
-            op_args={
-                frame: video.scanner_table(db).column('frame'),
-                frame_sampled: db.sampler.gather(frames)
-                if frames is not None else db.sampler.all(),
-                bboxes: db.table(bbox_output_name).column('bboxes'),
-                output: 'tmp'
-            })
-        db.run(BulkJob(output=output, jobs=[job]), force=True, pipeline_instances_per_node=1)
+        jobs = [
+            Job(
+                op_args={
+                    frame: db.table(v.scanner_name()).column('frame'),
+                    frame_sampled: db.sampler.gather(f) if f is not None else db.sampler.all(),
+                    bboxes: db.table(v.scanner_name() + '_bboxes_draw').column('bboxes'),
+                    output: 'tmp'
+                }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
+        ]
+        db.run(output, jobs, force=True)
 
         if path is None:
             path = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name

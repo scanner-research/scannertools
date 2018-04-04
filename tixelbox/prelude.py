@@ -11,7 +11,7 @@ import requests
 from contextlib import contextmanager
 import logging
 import datetime
-from scannerpy import ColumnType, DeviceType, Job, BulkJob, ScannerException
+from scannerpy import ColumnType, DeviceType, Job, ScannerException
 from scannerpy.stdlib import parsers, writers
 
 STORAGE = None
@@ -96,6 +96,25 @@ def imwrite(path, img):
     cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 
+def autobatch(uniforms=[]):
+    def wrapper(fn):
+        def newfn(*args, **kwargs):
+            positions = [x for x in uniforms if isinstance(x, int)]
+            keywords = [k for k in uniforms if isinstance(k, str)]
+
+            batched = isinstance(args[positions[0]], list)
+            if not batched:
+                args = [[x] if i not in positions else x for (i, x) in enumerate(args)]
+                kwargs = {k: [v] if k not in keywords else v for k, v in kwargs.iteritems()}
+
+            res = fn(*args, **kwargs)
+            return res[0] if not batched else res
+
+        return newfn
+
+    return wrapper
+
+
 @contextmanager
 def sample_video(delete=True):
     url = "https://storage.googleapis.com/scanner-data/test/short_video.mp4"
@@ -135,6 +154,12 @@ def tile(imgs, rows=None, cols=None):
         imgs.extend([np.zeros(imgs[0].shape, dtype=imgs[0].dtype) for _ in range(diff)])
 
     return np.vstack([np.hstack(imgs[i * cols:(i + 1) * cols]) for i in range(rows)])
+
+
+def scanner_ingest(db, videos):
+    videos = [v for v in videos if not db.has_table(v.scanner_name())]
+    if len(videos) > 0:
+        db.ingest_videos([(v.scanner_name(), v.path()) for v in videos], inplace=True)
 
 
 class Video:
@@ -184,14 +209,6 @@ class Video:
     def extract(self, path=None, ext='.mp4', segment=None):
         return ffmpeg_extract(
             input_path=self.path(), output_path=path, output_ext=ext, segment=segment)
-
-    def add_to_scanner(self, db):
-        table = self.scanner_name()
-        if not db.has_table(table):
-            db.ingest_videos([(table, self.path())], inplace=True)
-
-    def scanner_table(self, db):
-        return db.table(self.scanner_name())
 
     def montage(self, frames, rows=None, cols=None):
         frames = self.frames(frames)

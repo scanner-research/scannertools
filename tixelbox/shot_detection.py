@@ -24,23 +24,25 @@ def compute_shot_boundaries(hists):
     return boundaries
 
 
-def detect_shots(video, cache=False):
+@autobatch()
+def detect_shots(videos):
     log.debug('Connecting to scanner')
     with get_scanner_db() as db:
         log.debug('Ingesting video')
-        video.add_to_scanner(db)
+        scanner_ingest(db, videos)
 
-        hist_output_name = video.scanner_name() + '_hist'
-        if not db.has_table(hist_output_name) or not cache:
-            frame = db.sources.FrameColumn()
-            histogram = db.ops.Histogram(frame=frame)
-            output = db.sinks.Column(columns={'histogram': histogram})
-            job = Job(op_args={
+        frame = db.sources.FrameColumn()
+        histogram = db.ops.Histogram(
+            frame=frame, device=DeviceType.GPU if db.has_gpu() else DeviceType.CPU)
+        output = db.sinks.Column(columns={'histogram': histogram})
+        jobs = [
+            Job(op_args={
                 frame: video.scanner_table(db).column('frame'),
-                output: hist_output_name
-            })
-            db.run(BulkJob(output=output, jobs=[job]), force=True)
+                output: video.scanner_name() + '_hist'
+            }) for video in videos
+        ]
+        output_tables = db.run(output, jobs, force=True)
 
-        hists = list(db.table(hist_output_name).column('histogram').load(parsers.histograms))
+        all_hists = [list(t.column('histogram').load(parsers.histograms)) for t in output_tables]
 
-    return compute_shot_boundaries(hists)
+    return [compute_shot_boundaries(vid_hists) for vid_hists in all_hists]
