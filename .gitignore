@@ -3,3 +3,6 @@ __pycache__
 .gdb_history
 *.pyc
 docs/_build
+build
+dist
+*.egg-info

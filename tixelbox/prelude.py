@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import hwang
 import scannerpy
@@ -10,6 +11,8 @@ import requests
 from contextlib import contextmanager
 import logging
 import datetime
+from scannerpy import ColumnType, DeviceType, Job, BulkJob, ScannerException
+from scannerpy.stdlib import parsers, writers
 
 STORAGE = None
 LOCAL_STORAGE = None
@@ -89,6 +92,10 @@ def ffmpeg_extract(input_path, output_ext=None, output_path=None, segment=None):
     return output_path
 
 
+def imwrite(path, img):
+    cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+
+
 @contextmanager
 def sample_video(delete=True):
     url = "https://storage.googleapis.com/scanner-data/test/short_video.mp4"
@@ -112,13 +119,51 @@ def sample_video(delete=True):
         yield Video(f.name)
 
 
+def tile(imgs, rows=None, cols=None):
+    # If neither rows/cols is specified, make a square
+    if rows is None and cols is None:
+        rows = int(math.sqrt(len(imgs)))
+
+    if rows is None:
+        rows = (len(imgs) + cols - 1) / cols
+    else:
+        cols = (len(imgs) + rows - 1) / rows
+
+    # Pad missing frames with black
+    diff = rows * cols - len(imgs)
+    if diff != 0:
+        imgs.extend([np.zeros(imgs[0].shape, dtype=imgs[0].dtype) for _ in range(diff)])
+
+    return np.vstack([np.hstack(imgs[i * cols:(i + 1) * cols]) for i in range(rows)])
+
+
 class Video:
     def __init__(self, video_path):
         self._path = video_path
         self._storage = get_storage()
         video_file = storehouse.RandomReadFile(self._storage, video_path.encode('ascii'))
         self._decoder = hwang.Decoder(video_file)
-        self._fps = 29.97  # TODO: fetch this from video
+
+    def path(self):
+        return self._path
+
+    def scanner_name(self):
+        return self.path()
+
+    def width(self):
+        return self._decoder.video_index.frame_width
+
+    def height(self):
+        return self._decoder.video_index.frame_height
+
+    def fps(self):
+        return self._decoder.video_index.fps
+
+    def num_frames(self):
+        return self._decoder.video_index.frames
+
+    def duration(self):
+        return self._decoder.video_index.duration
 
     def frame(self, number=None, time=None):
         if time is not None:
@@ -128,12 +173,9 @@ class Video:
 
     def frames(self, numbers=None, times=None):
         if times is not None:
-            numbers = [int(n * self._fps) for n in times]
+            numbers = [int(n * self.fps()) for n in times]
 
         return self._decoder.retrieve(numbers)
-
-    def fps(self):
-        return self._fps
 
     def audio(self):
         audio_path = ffmpeg_extract(input_path=self.path(), output_ext='.wav')
@@ -143,12 +185,6 @@ class Video:
         return ffmpeg_extract(
             input_path=self.path(), output_path=path, output_ext=ext, segment=segment)
 
-    def path(self):
-        return self._path
-
-    def scanner_name(self):
-        return self.path()
-
     def add_to_scanner(self, db):
         table = self.scanner_name()
         if not db.has_table(table):
@@ -156,6 +192,10 @@ class Video:
 
     def scanner_table(self, db):
         return db.table(self.scanner_name())
+
+    def montage(self, frames, rows=None, cols=None):
+        frames = self.frames(frames)
+        return tile(frames, rows=rows, cols=cols)
 
 
 class Audio:

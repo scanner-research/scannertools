@@ -18,10 +18,17 @@ def audio(video):
 
 def test_frame(video):
     frame = video.frame(0)
-    assert frame.shape == (480, 640, 3)
+    assert frame.shape == (video.height(), video.width(), 3)
+
+
+def test_metadata(video):
+    video.fps()
+    video.num_frames()
+    video.duration()
 
 
 def test_frame_time(video):
+    video.frame(number=10)
     video.frame(time=10)
 
 

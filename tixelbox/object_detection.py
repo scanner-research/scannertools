@@ -1,7 +1,5 @@
 from prelude import *
 import bbox
-
-from scannerpy import ColumnType, DeviceType, Job, BulkJob, ScannerException
 from scannerpy.stdlib.util import download_temp_file, temp_directory
 import os
 import tarfile
@@ -16,7 +14,7 @@ DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
 LABEL_URL = 'https://storage.googleapis.com/scanner-data/public/mscoco_label_map.pbtxt'
 
 
-def detect_objects(video, force=False, nms_threshold=None):
+def detect_objects(video, frames=None, cache=False, nms_threshold=None):
     if not os.path.isdir(os.path.join(temp_directory(), MODEL_NAME)):
         log.debug('Downloading model')
         model_tar_path = download_temp_file(DOWNLOAD_BASE + MODEL_FILE)
@@ -30,7 +28,7 @@ def detect_objects(video, force=False, nms_threshold=None):
         video.add_to_scanner(db)
 
         bbox_output_name = video.scanner_name() + '_objdet'
-        if not db.has_table(bbox_output_name) or force:
+        if not db.has_table(bbox_output_name) or not cache:
             log.debug('Registering kernel')
 
             try:
@@ -48,7 +46,8 @@ def detect_objects(video, force=False, nms_threshold=None):
                 pass
 
             frame = db.sources.FrameColumn()
-            bboxes = db.ops.ObjDetect(frame=frame)
+            frame_sampled = frame.sample()
+            bboxes = db.ops.ObjDetect(frame=frame_sampled)
             outputs = {'bboxes': bboxes}
 
             if nms_threshold is not None:
@@ -57,23 +56,28 @@ def detect_objects(video, force=False, nms_threshold=None):
             output = db.sinks.Column(columns=outputs)
 
             log.debug('Running job')
-            job = Job(op_args={
-                frame: video.scanner_table(db).column('frame'),
-                output: bbox_output_name
-            })
+            job = Job(
+                op_args={
+                    frame:
+                    video.scanner_table(db).column('frame'),
+                    frame_sampled:
+                    db.sampler.gather(frames) if frames is not None else db.sampler.all(),
+                    output:
+                    bbox_output_name
+                })
             db.run(BulkJob(output=output, jobs=[job]), force=True, pipeline_instances_per_node=1)
 
         output_table = db.table(bbox_output_name)
         all_bboxes = [
             pickle.loads(box)
-            for (_, box) in output_table.column('nmsed_bboxes'
-                                                if nms_threshold is not None else 'bboxes').load()
+            for box in output_table.column('nmsed_bboxes'
+                                           if nms_threshold is not None else 'bboxes').load()
         ]
 
     return all_bboxes
 
 
-def draw_bboxes(video, bboxes, path=None):
+def draw_bboxes(video, bboxes, frames=None, path=None):
     log.debug('Connecting to scanner')
     with get_scanner_db() as db:
         log.debug('Ingesting video')
@@ -92,14 +96,17 @@ def draw_bboxes(video, bboxes, path=None):
             bbox_output_name, ['bboxes'], [[pickle.dumps(bb)] for bb in bboxes], force=True)
 
         frame = db.sources.FrameColumn()
+        frame_sampled = frame.sample()
         bboxes = db.sources.Column()
-        frame_drawn = db.ops.BboxDraw(frame=frame, bboxes=bboxes)
+        frame_drawn = db.ops.BboxDraw(frame=frame_sampled, bboxes=bboxes)
         output = db.sinks.Column(columns={'frame': frame_drawn})
 
         log.debug('Running job')
         job = Job(
             op_args={
                 frame: video.scanner_table(db).column('frame'),
+                frame_sampled: db.sampler.gather(frames)
+                if frames is not None else db.sampler.all(),
                 bboxes: db.table(bbox_output_name).column('bboxes'),
                 output: 'tmp'
             })
