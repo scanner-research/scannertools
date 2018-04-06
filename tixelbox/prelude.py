@@ -102,7 +102,12 @@ def autobatch(uniforms=[]):
             positions = [x for x in uniforms if isinstance(x, int)]
             keywords = [k for k in uniforms if isinstance(k, str)]
 
-            batched = isinstance(args[positions[0]], list)
+            if len(args) > 0:
+                nonuniform = args[next(iter(set(range(len(args))) - set(positions)))]
+            else:
+                nonuniform = kwargs[next(iter(set(kwargs.keys()) - set(keywords)))]
+
+            batched = isinstance(nonuniform, list)
             if not batched:
                 args = [[x] if i not in positions else x for (i, x) in enumerate(args)]
                 kwargs = {k: [v] if k not in keywords else v for k, v in kwargs.iteritems()}

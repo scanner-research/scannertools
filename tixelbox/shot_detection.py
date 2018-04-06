@@ -36,13 +36,18 @@ def detect_shots(videos):
             frame=frame, device=DeviceType.GPU if db.has_gpu() else DeviceType.CPU)
         output = db.sinks.Column(columns={'histogram': histogram})
         jobs = [
-            Job(op_args={
-                frame: video.scanner_table(db).column('frame'),
-                output: video.scanner_name() + '_hist'
-            }) for video in videos
+            Job(
+                op_args={
+                    frame: db.table(video.scanner_name()).column('frame'),
+                    output: video.scanner_name() + '_hist'
+                }) for video in videos
         ]
+
+        log.debug('Running scanner job')
         output_tables = db.run(output, jobs, force=True)
 
+        log.debug('Loading histograms')
         all_hists = [list(t.column('histogram').load(parsers.histograms)) for t in output_tables]
 
+    log.debug('Computing shot boundaries from histograms')
     return [compute_shot_boundaries(vid_hists) for vid_hists in all_hists]

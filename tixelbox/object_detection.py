@@ -1,5 +1,4 @@
 from prelude import *
-import bbox
 from scannerpy.stdlib.util import download_temp_file, temp_directory
 import os
 import tarfile
@@ -62,9 +61,10 @@ def detect_objects(videos, frames=None, nms_threshold=None):
                 }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
         ]
 
-        log.debug('Running job')
+        log.debug('Running object detection Scanner job')
         output_tables = db.run(output, jobs, force=True)
 
+        log.debug('Loading bounding boxes')
         all_bboxes = [[
             pickle.loads(box)
             for box in output_table.column('nmsed_bboxes'
@@ -79,7 +79,7 @@ def draw_bboxes(videos, bboxes, frames=None, path=None):
     log.debug('Connecting to scanner')
     with get_scanner_db() as db:
         log.debug('Ingesting video')
-        scanner_ingest(db, videps)
+        scanner_ingest(db, videos)
 
         try:
             db.register_op('BboxDraw', [('frame', ColumnType.Video), 'bboxes'],
@@ -89,7 +89,7 @@ def draw_bboxes(videos, bboxes, frames=None, path=None):
         except ScannerException:
             pass
 
-        for vid_bboxes in bboxes:
+        for (video, vid_bboxes) in zip(videos, bboxes):
             db.new_table(
                 video.scanner_name() + '_bboxes_draw', ['bboxes'],
                 [[pickle.dumps(bb)] for bb in vid_bboxes],
@@ -101,19 +101,26 @@ def draw_bboxes(videos, bboxes, frames=None, path=None):
         frame_drawn = db.ops.BboxDraw(frame=frame_sampled, bboxes=bboxes)
         output = db.sinks.Column(columns={'frame': frame_drawn})
 
-        log.debug('Running job')
+        log.debug('Running draw bboxes Scanner job')
         jobs = [
             Job(
                 op_args={
                     frame: db.table(v.scanner_name()).column('frame'),
                     frame_sampled: db.sampler.gather(f) if f is not None else db.sampler.all(),
                     bboxes: db.table(v.scanner_name() + '_bboxes_draw').column('bboxes'),
-                    output: 'tmp'
+                    output: v.scanner_name() + '_tmp'
                 }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
         ]
         db.run(output, jobs, force=True)
 
         if path is None:
-            path = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
+            path = [
+                tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
+                for _ in range(len(videos))
+            ]
 
-        db.table('tmp').column('frame').save_mp4(os.path.splitext(path)[0])
+        log.debug('Saving output video')
+        for (video, p) in zip(videos, path):
+            db.table(v.scanner_name() + '_tmp').column('frame').save_mp4(os.path.splitext(p)[0])
+
+    return path
