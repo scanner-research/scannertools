@@ -6,7 +6,7 @@ install:
 
 script:
   - sphinx-apidoc -f -o doc/source tixelbox
-  - travis-sphinx build -s doc-n
+  - travis-sphinx build -s doc -n
 
 after_success:
   - travis-sphinx deploy
