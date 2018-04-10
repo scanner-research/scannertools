@@ -5,8 +5,8 @@ install:
   - pip install travis-sphinx
 
 script:
-  - sphinx-apidoc -f -o source tixelbox
-  - travis-sphinx build -s doc
+  - sphinx-apidoc -f -o doc/source tixelbox
+  - travis-sphinx build -s doc-n
 
 after_success:
   - travis-sphinx deploy
