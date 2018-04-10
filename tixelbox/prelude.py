@@ -2,20 +2,29 @@ import math
 import numpy as np
 import hwang
 import scannerpy
-import cv2
 import storehouse
 import tempfile
 import subprocess as sp
 import os
-import requests
 from contextlib import contextmanager
 import logging
 import datetime
 from scannerpy import ColumnType, DeviceType, Job, ScannerException
 from scannerpy.stdlib import parsers, writers
+import importlib
 
 STORAGE = None
 LOCAL_STORAGE = None
+
+
+def try_import(to_import, current_module):
+    try:
+        return importlib.import_module(to_import)
+    except ImportError:
+        raise Exception(
+            'Module {} requires package `{}`, but you don\'t have it installed. Install it to use this module.'.
+            format(current_module, to_import))
+
 
 log = logging.getLogger('tixelbox')
 log.setLevel(logging.DEBUG)
@@ -89,6 +98,7 @@ def ffmpeg_extract(input_path, output_ext=None, output_path=None, segment=None):
 
 
 def imwrite(path, img):
+    cv2 = try_import('cv2', __name__)
     cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 
@@ -118,6 +128,8 @@ def autobatch(uniforms=[]):
 
 @contextmanager
 def sample_video(delete=True):
+    import requests
+
     url = "https://storage.googleapis.com/scanner-data/test/short_video.mp4"
 
     if delete:
@@ -166,8 +178,7 @@ def scanner_ingest(db, videos):
 class Video:
     def __init__(self, video_path):
         self._path = video_path
-        self._storage = get_storage()
-        video_file = storehouse.RandomReadFile(self._storage, video_path.encode('ascii'))
+        video_file = storehouse.RandomReadFile(get_storage(), video_path.encode('ascii'))
         self._decoder = hwang.Decoder(video_file)
 
     def path(self):

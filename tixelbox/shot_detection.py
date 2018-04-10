@@ -1,7 +1,8 @@
 from prelude import *
 from scipy.spatial import distance
 import numpy as np
-import cv2
+
+cv2 = try_import('cv2', __name__)
 
 WINDOW_SIZE = 500
 

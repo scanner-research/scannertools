@@ -1,8 +1,10 @@
-from prelude import *
+from ..prelude import *
 from scannerpy.stdlib.util import download_temp_file, temp_directory
 import os
 import tarfile
 import pickle
+
+try_import('tensorflow', __name__)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 

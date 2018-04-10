@@ -32,8 +32,10 @@ import PIL.ImageColor as ImageColor
 import PIL.ImageDraw as ImageDraw
 import PIL.ImageFont as ImageFont
 import six
-import tensorflow as tf
 import re
+
+from ..prelude import *
+tf = try_import('tensorflow', __name__)
 
 _TITLE_LEFT_MARGIN = 10
 _TITLE_TOP_MARGIN = 10

@@ -9,4 +9,5 @@ setup(
     author_email='apoms@cs.stanford.edu',
     license='Apache 2.0',
     packages=['tixelbox'],
+    install_requires=['requests', 'numpy', 'scipy', 'requests'],
     zip_safe=False)
