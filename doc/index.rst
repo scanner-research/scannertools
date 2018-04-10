@@ -6,7 +6,7 @@
 Tixelbox
 ====================================
 
-This is the official documentation for the [tixelbox](https://github.com/scanner-research/tixelbox) video processing library.
+This is the official documentation for the `tixelbox <https://github.com/scanner-research/tixelbox>` video processing library.
 
 .. toctree::
    :maxdepth: 2
