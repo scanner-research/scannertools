@@ -12,10 +12,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
-
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
@@ -28,7 +27,6 @@ version = u''
 # The full version, including alpha/beta/rc tags
 release = u''
 
-
 # -- General configuration ---------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
@@ -38,9 +36,10 @@ release = u''
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = [
-    'sphinx.ext.autodoc',
-]
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.napoleon']
+
+# Napoleon settings
+napoleon_include_init_with_doc = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -68,7 +67,6 @@ exclude_patterns = [u'_build', 'Thumbs.db', '.DS_Store']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
-
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -98,12 +96,10 @@ html_static_path = ['_static']
 #
 # html_sidebars = {}
 
-
 # -- Options for HTMLHelp output ---------------------------------------------
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'tixelboxdoc'
-
 
 # -- Options for LaTeX output ------------------------------------------------
 
@@ -129,20 +125,15 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'tixelbox.tex', u'tixelbox Documentation',
-     u'Alex Poms and Will Crichton', 'manual'),
+    (master_doc, 'tixelbox.tex', u'tixelbox Documentation', u'Alex Poms and Will Crichton',
+     'manual'),
 ]
-
 
 # -- Options for manual page output ------------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'tixelbox', u'tixelbox Documentation',
-     [author], 1)
-]
-
+man_pages = [(master_doc, 'tixelbox', u'tixelbox Documentation', [author], 1)]
 
 # -- Options for Texinfo output ----------------------------------------------
 
@@ -150,10 +141,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'tixelbox', u'tixelbox Documentation',
-     author, 'tixelbox', 'One line description of project.',
-     'Miscellaneous'),
+    (master_doc, 'tixelbox', u'tixelbox Documentation', author, 'tixelbox',
+     'One line description of project.', 'Miscellaneous'),
 ]
-
 
 # -- Extension configuration -------------------------------------------------

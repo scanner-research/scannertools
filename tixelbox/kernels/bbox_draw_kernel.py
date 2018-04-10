@@ -5,7 +5,7 @@ from scannerpy.stdlib.util import default, temp_directory
 from scannerpy.stdlib.bboxes import proto_to_np
 import numpy as np
 import pickle
-from tixelbox import vis_utils
+from tixelbox import tf_vis_utils
 import os
 import cv2
 import PIL.Image as Image
@@ -13,9 +13,9 @@ import PIL.Image as Image
 
 class BboxDrawKernel(scannerpy.Kernel):
     def __init__(self, config, protobufs):
-        categories = vis_utils.parse_labelmap(
+        categories = tf_vis_utils.parse_labelmap(
             os.path.join(temp_directory(), 'mscoco_label_map.pbtxt'))
-        self._category_index = vis_utils.create_category_index(categories)
+        self._category_index = tf_vis_utils.create_category_index(categories)
         self._protobufs = protobufs
 
     def execute(self, input_columns):
@@ -30,7 +30,7 @@ class BboxDrawKernel(scannerpy.Kernel):
         bboxes[:, [2, 3]] = bboxes[:, [3, 2]]
 
         return [
-            vis_utils.visualize_boxes_and_labels_on_image_array(
+            tf_vis_utils.visualize_boxes_and_labels_on_image_array(
                 frame,
                 bboxes[:, :4],
                 bboxes[:, 5].astype(np.int32),

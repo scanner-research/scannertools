@@ -1,4 +1,4 @@
-from ..prelude import *
+from prelude import *
 from scannerpy.stdlib.util import download_temp_file, temp_directory
 import os
 import tarfile
@@ -17,6 +17,22 @@ LABEL_URL = 'https://storage.googleapis.com/scanner-data/public/mscoco_label_map
 
 @autobatch(uniforms=[0, 'nms_threshold'])
 def detect_objects(db, videos, frames=None, nms_threshold=None):
+    """
+    detect_objects(db, videos, frames=None, nms_threshold=None)
+    Detects objects in a video.
+
+    Uses the SSD-Mobilenet architecture from the TensorFlow `Object Detection API <https://github.com/tensorflow/models/tree/abd504235f3c2eed891571d62f0a424e54a2dabc/research/object_detection>`_.
+
+    Args:
+        db (scannerpy.Database): Handle to Scanner database.
+        videos (Video, autobatched): Videos to process.
+        frames (List[int], autobatched, optional): Frame indices to process.
+        nms_threshold (float, optional): Fraction of IoU to merge bounding boxes during NMS.
+
+    Returns:
+        List[List[BoundingBox]] (autobatched): List of bounding boxes for each frame.
+    """
+
     if not os.path.isdir(os.path.join(temp_directory(), MODEL_NAME)):
         log.debug('Downloading model')
         model_tar_path = download_temp_file(DOWNLOAD_BASE + MODEL_FILE)

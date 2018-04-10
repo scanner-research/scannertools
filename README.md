@@ -7,7 +7,7 @@ Tixelbox is a high-level Python library for scalable video analysis built on the
 * [Pose detection](https://github.com/scanner-research/tixelbox/blob/master/examples/pose_detection.py)
 * [Optical flow](https://github.com/scanner-research/tixelbox/blob/master/examples/optical_flow.py)
 * [Shot detection](https://github.com/scanner-research/tixelbox/blob/master/examples/shot_detection.py)
-* [Random video frame access](https://github.com/scanner-research/tixelbox/blob/master/examples/frame_montage.py)
+* [Random frame access](https://github.com/scanner-research/tixelbox/blob/master/examples/frame_montage.py)
 
 ## Usage
 

@@ -7,7 +7,7 @@ cv2 = try_import('cv2', __name__)
 WINDOW_SIZE = 500
 
 
-def compute_shot_boundaries(hists):
+def _compute_shot_boundaries(hists):
     # Compute the mean difference between each pair of adjacent frames
     diffs = np.array([
         np.mean([distance.chebyshev(hists[i - 1][j], hists[i][j]) for j in range(3)])
@@ -27,6 +27,17 @@ def compute_shot_boundaries(hists):
 
 @autobatch()
 def detect_shots(videos):
+    """
+    detect_shots(videos)
+    Detects shot boundaries in a video.
+
+    Args:
+        videos (Video, autobatched): Videos to process.
+
+    Returns:
+        Indices of the frames that are shot boundaries.
+    """
+
     log.debug('Connecting to scanner')
     with get_scanner_db() as db:
         log.debug('Ingesting video')
@@ -51,4 +62,4 @@ def detect_shots(videos):
         all_hists = [list(t.column('histogram').load(parsers.histograms)) for t in output_tables]
 
     log.debug('Computing shot boundaries from histograms')
-    return [compute_shot_boundaries(vid_hists) for vid_hists in all_hists]
+    return [_compute_shot_boundaries(vid_hists) for vid_hists in all_hists]

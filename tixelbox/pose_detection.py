@@ -4,7 +4,13 @@ from scannerpy.stdlib.util import temp_directory, download_temp_file
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def detect_poses(video, frames=None, cache=False, models_path=None, batch=1):
+@autobatch(uniforms=[0, 'cache', 'models_path', 'batch'])
+def detect_poses(db, video, frames=None, cache=False, models_path=None, batch=1):
+    """
+    detect_poses(video, frames=None, cache=False, models_path=None, batch=1)
+    WIP, don't use
+    """
+
     if models_path is None:
         models_path = os.path.join(temp_directory(), 'openpose')
         pose_fs_url = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/'

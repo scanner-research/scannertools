@@ -11,6 +11,19 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @autobatch(uniforms=[0])
 def detect_faces(db, videos, frames=None):
+    """
+    detect_faces(db, videos, frames=None)
+    Detects faces in a video.
+
+    Args:
+        db (scannerpy.Database): Handle to Scanner database.
+        videos (Video, autobatched): Videos to process.
+        frames (List[int], autobatched, optional): Frame indices to process.
+
+    Returns:
+        List[List[BoundingBox]] (autobatched): List of bounding boxes for each frame.
+    """
+
     prototxt_path = download_temp_file(
         'https://storage.googleapis.com/scanner-data/nets/caffe_facenet/facenet_deploy.prototxt')
     model_weights_path = download_temp_file(

@@ -7,6 +7,21 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @autobatch(uniforms=[0])
 def draw_flow_fields(db, videos, flow_fields, frames=None, path=None):
+    """
+    draw_flow_fields(db, videos, flow_fields, frames=None, path=None)
+    Draws flow fields next to the original video.
+
+    Args:
+        db (scannerpy.Database): Handle to Scanner database.
+        videos (Video, autobatched): Video to process.
+        flow_fields (str, autobatched): Scanner table name containing flow fields.
+        frames (List[int], autobatched, optional): Frame indices to process.
+        path (str, optional): Video output path.
+
+    Returns:
+        str: Path to output video.
+    """
+
     log.debug('Ingesting video')
     scanner_ingest(db, videos)
 
@@ -52,6 +67,21 @@ def draw_flow_fields(db, videos, flow_fields, frames=None, path=None):
 
 @autobatch(uniforms=[0])
 def draw_bboxes(db, videos, bboxes, frames=None, path=None):
+    """
+    draw_bboxes(db, videos, bboxes, frames=None, path=None)
+    Draws bounding boxes on a video.
+
+    Args:
+        db (scannerpy.Database): Handle to Scanner database.
+        videos (Video, autobatched): Video to process.
+        bboxes (List[List[BoundingBox]], autobatched): Bounding boxes to draw.
+        frames (List[int], autobatched, optional): Frame indices to process.
+        path (str, optional): Video output path.
+
+    Returns:
+        str: Path to output video.
+    """
+
     log.debug('Ingesting video')
     scanner_ingest(db, videos)
 

@@ -7,6 +7,22 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @autobatch(uniforms=[0])
 def compute_flow(db, videos, frames=None):
+    """
+    compute_flow(db, videos, frames=None)
+    Computes optical flow on a video.
+
+    Unlike other functions, flow fields aren't materialized into memory as they're simply
+    too large.
+
+    Args:
+        db (scannerpy.Database): Handle to Scanner database.
+        videos (Video, autobatched): Videos to process.
+        frames (List[int], autobatched, optional): Frame indices to process.
+
+    Returns:
+        str (autobatched): Scanner table name
+    """
+
     log.debug('Ingesting video')
     scanner_ingest(db, videos)
 

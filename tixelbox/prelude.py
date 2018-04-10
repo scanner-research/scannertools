@@ -12,6 +12,7 @@ import datetime
 from scannerpy import ColumnType, DeviceType, Job, ScannerException
 from scannerpy.stdlib import parsers, writers
 import importlib
+from functools import wraps
 
 STORAGE = None
 LOCAL_STORAGE = None
@@ -104,6 +105,7 @@ def imwrite(path, img):
 
 def autobatch(uniforms=[]):
     def wrapper(fn):
+        @wraps(fn)
         def newfn(*args, **kwargs):
             positions = [x for x in uniforms if isinstance(x, int)]
             keywords = [k for k in uniforms if isinstance(k, str)]
@@ -129,13 +131,15 @@ def autobatch(uniforms=[]):
 @contextmanager
 def sample_video(delete=True):
     import requests
+    from video import Video
 
     url = "https://storage.googleapis.com/scanner-data/test/short_video.mp4"
 
     if delete:
         f = tempfile.NamedTemporaryFile(suffix='.mp4')
     else:
-        sample_path = '/tmp/sample_video.mp4'
+        # sample_path = '/tmp/sample_video.mp4'
+        sample_path = 'solo.mp4'
         if os.path.isfile(sample_path):
             yield Video(sample_path)
             return
@@ -173,70 +177,6 @@ def scanner_ingest(db, videos):
     videos = [v for v in videos if not db.has_table(v.scanner_name())]
     if len(videos) > 0:
         db.ingest_videos([(v.scanner_name(), v.path()) for v in videos], inplace=True)
-
-
-class Video:
-    def __init__(self, video_path):
-        self._path = video_path
-        video_file = storehouse.RandomReadFile(get_storage(), video_path.encode('ascii'))
-        self._decoder = hwang.Decoder(video_file)
-
-    def path(self):
-        return self._path
-
-    def scanner_name(self):
-        return self.path()
-
-    def width(self):
-        return self._decoder.video_index.frame_width
-
-    def height(self):
-        return self._decoder.video_index.frame_height
-
-    def fps(self):
-        return self._decoder.video_index.fps
-
-    def num_frames(self):
-        return self._decoder.video_index.frames
-
-    def duration(self):
-        return self._decoder.video_index.duration
-
-    def frame(self, number=None, time=None):
-        if time is not None:
-            return self.frames(times=[time])[0]
-        else:
-            return self.frames(numbers=[number])[0]
-
-    def frames(self, numbers=None, times=None):
-        if times is not None:
-            numbers = [int(n * self.fps()) for n in times]
-
-        return self._decoder.retrieve(numbers)
-
-    def audio(self):
-        audio_path = ffmpeg_extract(input_path=self.path(), output_ext='.wav')
-        return Audio(audio_path)
-
-    def extract(self, path=None, ext='.mp4', segment=None):
-        return ffmpeg_extract(
-            input_path=self.path(), output_path=path, output_ext=ext, segment=segment)
-
-    def montage(self, frames, rows=None, cols=None):
-        frames = self.frames(frames)
-        return tile(frames, rows=rows, cols=cols)
-
-
-class Audio:
-    def __init__(self, audio_path):
-        self._path = audio_path
-
-    def extract(self, path=None, ext='.wav', segment=None):
-        return ffmpeg_extract(
-            input_path=self.path(), output_path=path, output_ext=ext, segment=segment)
-
-    def path(self):
-        return self._path
 
 
 class WithMany:
