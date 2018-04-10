@@ -1,6 +1,6 @@
 # Tixelbox: video processing toolkit &nbsp; [![Build Status](https://travis-ci.org/scanner-research/tixelbox.svg?branch=master)](https://travis-ci.org/scanner-research/tixelbox)
 
-Tixelbox is a high-level Python library for scalable video analysis built on the [Scanner](https://github.com/scanner-research/scanner/) video processing engine. Tixelbox is _not_ an ffmpeg replacement---its primary purpose is analysis, not transcoding. Tixelbox provides easy-to-use, off-the-shelf implementations of algorithms including:
+Tixelbox is a high-level Python library for scalable video analysis built on the [Scanner](https://github.com/scanner-research/scanner/) video processing engine. Tixelbox is _not_ an ffmpeg replacement--its primary purpose is analysis, not transcoding. Tixelbox provides easy-to-use, off-the-shelf implementations of:
 
 * [Object detection](https://github.com/scanner-research/tixelbox/blob/master/examples/object_detection.py)
 * [Face detection](https://github.com/scanner-research/tixelbox/blob/master/examples/face_detection.py)
@@ -11,7 +11,7 @@ Tixelbox is a high-level Python library for scalable video analysis built on the
 
 ## Usage
 
-Here's an example using Tixelbox to extract faces and then draw the bounding boxes a single frame.
+Here's an example using Tixelbox to extract faces every 10th frame of a video, and then to draw the bounding boxes on a single frame.
 
 ```python
 import tixelbox as tb
@@ -23,13 +23,13 @@ import cv2
 video = tb.Video('path/to/your/video.mp4')
 frame_nums = list(range(0, video.num_frames(), 10))
 
-# Run the face detection algorith,
+# Run the face detection algorithm
 with scannerpy.Database() as db:
     face_bboxes = facedet.detect_faces(db, video, frame_nums)
 
 # Draw the bounding boxes
-frame = video.frame(frame_nums[10])
-for bbox in face_bboxes[10]:
+frame = video.frame(frame_nums[3])
+for bbox in face_bboxes[3]:
     cv2.rectangle(
         frame,
         (int(bbox.x1 * video.width()), int(bbox.y1 * video.height())),
@@ -41,7 +41,7 @@ for bbox in face_bboxes[10]:
 tb.imwrite('example.jpg', frame)
 ```
 
-For more examples, see the [examples](https://github.com/scanner-research/tixelbox/tree/master/examples) directory. For the API reference, see our [documentation](https://scanner-research.github.io/scanner/).
+For more examples, see the [examples](https://github.com/scanner-research/tixelbox/tree/master/examples) directory. For the API reference, see our [documentation](https://scanner-research.github.io/tixelbox/).
 
 ## Installation
 
