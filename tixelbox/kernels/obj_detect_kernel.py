@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 import cv2
 import os
-from scannerpy.stdlib import kernel
+from scannerpy.stdlib import kernel, writers
 import pickle
 
 ##################################################################################################
@@ -43,13 +43,14 @@ class ObjDetectKernel(kernel.TensorFlowKernel):
                     image_tensor: np.expand_dims(image, axis=0)
                 })
 
-            # bundled data format: [box position(x1 y1 x2 y2), box score, box class]
-            bundled_data = np.hstack(
-                [boxes.reshape(100, 4),
-                 scores.reshape(100, 1),
-                 classes.reshape(100, 1)])
+            bboxes = [
+                self.protobufs.BoundingBox(
+                    x1=box[1], y1=box[0], x2=box[3], y2=box[2], score=score, label=cls)
+                for (box, score, cls) in zip(
+                    boxes.reshape(100, 4), scores.reshape(100, 1), classes.reshape(100, 1))
+            ]
 
-            return [pickle.dumps(bundled_data)]
+            return [writers.bboxes(bboxes, self.protobufs)]
 
 
 KERNEL = ObjDetectKernel

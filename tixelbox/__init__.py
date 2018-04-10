@@ -1,4 +1,4 @@
-from prelude import Video, Audio, init_storage, sample_video, imwrite
+from prelude import Video, Audio, WithMany, init_storage, sample_video, imwrite
 import object_detection
 import pose_detection
 import shot_detection

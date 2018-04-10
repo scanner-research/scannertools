@@ -10,16 +10,15 @@ import pickle
 class BboxNMSKernel(scannerpy.Kernel):
     def __init__(self, config, protobufs):
         self._protobufs = protobufs
-        self._threshold = default(config.args, 'threshold', 0.1)
+        self._threshold = default(config.args, 'threshold', 0.3)
 
     def execute(self, input_columns):
         bboxes_list = []
         for c in input_columns:
-            bb = pickle.loads(input_columns[0])  #parsers.bboxes(c, self._protobufs)
-            nmsed_bboxes = bboxes.nms(bb, self._threshold)
-            bboxes_list.append(pickle.dumps(nmsed_bboxes))
-        #return writers.bboxes([nmsed_bboxes], self._protobufs)
-        return bboxes_list
+            bboxes_list += parsers.bboxes(c, self._protobufs)
+
+        nmsed_bboxes = bboxes.nms(bboxes_list, self._threshold)
+        return [writers.bboxes(nmsed_bboxes, self._protobufs)]
 
 
 KERNEL = BboxNMSKernel

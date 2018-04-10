@@ -3,8 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to tixelbox's documentation!
+Tixelbox
 ====================================
+
+Tixelbox is a toolbox for video analysis in Python with an emphasis on efficiency and scalability. It uses the [Scanner](https://github.com/scanner-research/scanner/)
 
 .. toctree::
    :maxdepth: 2

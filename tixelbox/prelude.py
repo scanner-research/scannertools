@@ -56,10 +56,6 @@ def get_storage():
     return STORAGE
 
 
-def get_scanner_db():
-    return scannerpy.Database()
-
-
 def ffmpeg_fmt_time(t):
     return '{:02d}:{:02d}:{:02d}.{:03d}'.format(
         int(t / 3600), int(t / 60 % 60), int(t % 60), int(t * 1000 % 1000))
@@ -230,3 +226,15 @@ class Audio:
 
     def path(self):
         return self._path
+
+
+class WithMany:
+    def __init__(self, *args):
+        self._args = args
+
+    def __enter__(self):
+        return tuple([obj.__enter__() for obj in self._args])
+
+    def __exit__(self, *args, **kwargs):
+        for obj in self._args:
+            obj.__exit__(*args, **kwargs)
