@@ -4,6 +4,7 @@ services:
   - docker
 
 before_install:
+  - pip install travis-sphinx
   - docker pull scannerresearch/scanner:cpu
   - docker run --name main -w /app -v $(pwd):/app -d scannerresearch/scanner:cpu sleep infinity
 
@@ -11,4 +12,4 @@ script:
   - docker exec main ./travis.sh
 
 after_success:
-  - docker exec main travis-sphinx deploy
+  - travis-sphinx deploy
