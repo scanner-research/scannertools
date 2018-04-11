@@ -94,6 +94,7 @@ def detect_faces(db, videos, frames=None):
             work_packet_size=batch * 4,
             io_packet_size=batch * 20,
             pipeline_instances_per_node=pipeline_instances)
+
         output = [db.table('{}_{}'.format(output_name, scale)) for output_name in output_names]
         outputs.append(output)
 
@@ -101,11 +102,9 @@ def detect_faces(db, videos, frames=None):
     db.register_op('BboxNMS', [], ['nmsed_bboxes'], variadic_inputs=True)
     kernel_path = SCRIPT_DIR + '/kernels/bbox_nms_kernel.py'
     db.register_python_kernel('BboxNMS', DeviceType.CPU, kernel_path)
-    # scale = max(width / float(max_width), 1.0)
-    scale = 1.0
 
     bbox_inputs = [db.sources.Column() for _ in outputs]
-    nmsed_bboxes = db.ops.BboxNMS(*bbox_inputs, threshold=0.3)
+    nmsed_bboxes = db.ops.BboxNMS(*bbox_inputs, threshold=0.1)
     output = db.sinks.Column(columns={'nmsed_bboxes': nmsed_bboxes})
 
     jobs = []

@@ -1,6 +1,7 @@
 import tixelbox as tb
 import tixelbox.face_detection as facedet
 import tixelbox.vis as vis
+import scannerpy
 import os
 
 with tb.WithMany(scannerpy.Database(), tb.sample_video()) as (db, video):

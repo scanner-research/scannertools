@@ -139,7 +139,7 @@ def sample_video(delete=True):
         f = tempfile.NamedTemporaryFile(suffix='.mp4')
     else:
         # sample_path = '/tmp/sample_video.mp4'
-        sample_path = 'solo.mp4'
+        sample_path = 'baby_driver.mp4'
         if os.path.isfile(sample_path):
             yield Video(sample_path)
             return

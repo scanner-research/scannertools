@@ -128,3 +128,41 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
         db.table(v.scanner_name() + '_tmp').column('frame').save_mp4(os.path.splitext(p)[0])
 
     return path
+
+
+@autobatch(uniforms=[0])
+def draw_poses(db, videos, poses, frames=None, path=None):
+    log.debug('Ingesting video')
+    video.add_to_scanner(db)
+
+    try:
+        db.register_op('PoseDraw', [('frame', ColumnType.Video), 'poses'],
+                       [('frame', ColumnType.Video)])
+        db.register_python_kernel('PoseDraw', DeviceType.CPU,
+                                  SCRIPT_DIR + '/kernels/pose_draw_kernel.py')
+    except ScannerException:
+        pass
+
+    poses_output_name = video.scanner_name() + '_poses_draw'
+    db.new_table(poses_output_name, ['poses'], [[p] for p in poses], fn=writers.poses, force=True)
+
+    frame = db.sources.FrameColumn()
+    frame_sampled = frame.sample()
+    poses = db.sources.Column()
+    frame_drawn = db.ops.PoseDraw(frame=frame_sampled, poses=poses)
+    output = db.sinks.Column(columns={'frame': frame_drawn})
+
+    log.debug('Running job')
+    job = Job(
+        op_args={
+            frame: video.scanner_table(db).column('frame'),
+            frame_sampled: db.sampler.gather(frames) if frames is not None else db.sampler.all(),
+            poses: db.table(poses_output_name).column('poses'),
+            output: 'tmp'
+        })
+    db.run(BulkJob(output=output, jobs=[job]), force=True)
+
+    if path is None:
+        path = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
+
+    db.table('tmp').column('frame').save_mp4(os.path.splitext(path)[0])

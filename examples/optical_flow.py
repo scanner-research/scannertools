@@ -1,6 +1,7 @@
 import tixelbox as tb
 import tixelbox.optical_flow as optflow
 import tixelbox.vis as vis
+import scannerpy
 import os
 
 with tb.WithMany(scannerpy.Database(), tb.sample_video()) as (db, video):

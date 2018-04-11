@@ -1,6 +1,6 @@
 # Tixelbox: video processing toolkit &nbsp; [![Build Status](https://travis-ci.org/scanner-research/tixelbox.svg?branch=master)](https://travis-ci.org/scanner-research/tixelbox)
 
-Tixelbox is a high-level Python library for scalable video analysis built on the [Scanner](https://github.com/scanner-research/scanner/) video processing engine. Tixelbox is _not_ an ffmpeg replacement--its primary purpose is analysis, not transcoding. Tixelbox provides easy-to-use, off-the-shelf implementations of:
+Tixelbox is a high-level Python library for scalable video analysis built on the [Scanner](https://github.com/scanner-research/scanner/) video processing engine. Tixelbox provides easy-to-use, off-the-shelf implementations of:
 
 * [Object detection](https://github.com/scanner-research/tixelbox/blob/master/examples/object_detection.py)
 * [Face detection](https://github.com/scanner-research/tixelbox/blob/master/examples/face_detection.py)
@@ -45,4 +45,10 @@ For more examples, see the [examples](https://github.com/scanner-research/tixelb
 
 ## Installation
 
-TODO
+Tixelbox requires the Python packages for our three libraries [Scanner](https://github.com/scanner-research/scanner/), [Storehouse](https://github.com/scanner-research/storehouse/), and [Hwang](https://github.com/scanner-research/hwang) to be installed. See each page for respective instructions. Tixelbox has optional dependencies for certain pipelines, namely TensorFlow and OpenCV. With the dependencies installed, just run:
+
+```
+pip install tixelbox
+```
+
+Then try running any of the examples!

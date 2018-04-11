@@ -1,5 +1,7 @@
 import tixelbox as tb
 import tixelbox.pose_detection as posedet
+import scannerpy
+import os
 
 with tb.WithMany(scannerpy.Database(), tb.sample_video()) as (db, video):
     frames = [0, 100, 200]
