@@ -8,6 +8,8 @@ import tixelbox.pose_detection as posedet
 import scannerpy
 import os
 import subprocess as sp
+import tempfile
+import toml
 
 try:
     sp.check_call(['nvidia-smi'])
@@ -33,8 +35,16 @@ def audio(video):
 
 @pytest.fixture(scope='module')
 def db():
-    with scannerpy.Database() as db:
-        yield db
+    cfg = scannerpy.Config.default_config()
+    cfg['network']['master'] = 'localhost'
+    cfg['storage']['db_path'] = tempfile.mkdtemp()
+
+    with tempfile.NamedTemporaryFile() as cfg_f:
+        cfg_f.write(toml.dumps(cfg))
+        cfg_f.flush()
+
+        with scannerpy.Database(config_path=cfg_f.name) as db:
+            yield db
 
 
 def test_frame(video):
