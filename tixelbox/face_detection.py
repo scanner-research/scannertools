@@ -1,4 +1,5 @@
 from prelude import *
+from scannerpy import ScannerException
 from scannerpy.stdlib import NetDescriptor, parsers
 from scannerpy.stdlib.util import download_temp_file, temp_directory
 from scannerpy.stdlib.bboxes import proto_to_np
@@ -87,6 +88,7 @@ def detect_faces(db, videos, frames=None):
                 })
             jobs.append(job)
 
+        log.debug('Running face detection (scale {}) Scanner job'.format(scale))
         output = db.run(
             output,
             jobs,
@@ -99,9 +101,12 @@ def detect_faces(db, videos, frames=None):
         outputs.append(output)
 
     # Register nms bbox op and kernel
-    db.register_op('BboxNMS', [], ['nmsed_bboxes'], variadic_inputs=True)
-    kernel_path = SCRIPT_DIR + '/kernels/bbox_nms_kernel.py'
-    db.register_python_kernel('BboxNMS', DeviceType.CPU, kernel_path)
+    try:
+        db.register_op('BboxNMS', [], ['nmsed_bboxes'], variadic_inputs=True)
+        db.register_python_kernel('BboxNMS', DeviceType.CPU,
+                                  SCRIPT_DIR + '/kernels/bbox_nms_kernel.py')
+    except ScannerException:
+        pass
 
     bbox_inputs = [db.sources.Column() for _ in outputs]
     nmsed_bboxes = db.ops.BboxNMS(*bbox_inputs, threshold=0.1)
@@ -115,6 +120,7 @@ def detect_faces(db, videos, frames=None):
         op_args[output] = output_names[i]
         jobs.append(Job(op_args=op_args))
 
+    log.debug('Running bbox nms Scanner job')
     output_tables = db.run(output, jobs, force=True)
 
     output_tables = [db.table(n) for n in output_names]

@@ -52,7 +52,7 @@ def detect_objects(db, videos, frames=None, nms_threshold=None):
         pass
 
     try:
-        db.register_op('BboxNMS', ['bboxes'], ['bboxes'])
+        db.register_op('BboxNMS', [], ['nmsed_bboxes'], variadic_inputs=True)
         db.register_python_kernel('BboxNMS', DeviceType.CPU,
                                   SCRIPT_DIR + '/kernels/bbox_nms_kernel.py')
     except ScannerException:
@@ -64,7 +64,7 @@ def detect_objects(db, videos, frames=None, nms_threshold=None):
     outputs = {'bboxes': bboxes}
 
     if nms_threshold is not None:
-        outputs['nmsed_bboxes'] = db.ops.BboxNMS(bboxes=bboxes, threshold=nms_threshold)
+        outputs['nmsed_bboxes'] = db.ops.BboxNMS(bboxes, threshold=nms_threshold)
 
     output = db.sinks.Column(columns=outputs)
 
