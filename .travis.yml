@@ -1,12 +1,14 @@
+sudo: required
 language: python
-sudo: false
+services:
+  - docker
 
-install:
-  - pip install travis-sphinx
+before_install:
+  - docker pull scannerresearch/scanner:cpu
+  - docker run --name main -w /app -v $(pwd):/app -d scannerresearch/scanner:cpu sleep infinity
 
 script:
-  - sphinx-apidoc -f -o doc/source tixelbox
-  - travis-sphinx build -s doc -n
+  - docker exec main ./travis.sh
 
 after_success:
-  - travis-sphinx deploy
+  - docker exec main travis-sphinx deploy
