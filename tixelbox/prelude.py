@@ -1,16 +1,18 @@
 import math
 import numpy as np
+import storehouse
+# Note: it's critical to import Hwang before Scanner, or else protobuf will complain (fatally)
+# that protobufs are being re-registered.
 import hwang
 import scannerpy
-import storehouse
+from scannerpy import ColumnType, DeviceType, Job, ScannerException
+from scannerpy.stdlib import parsers, writers
 import tempfile
 import subprocess as sp
 import os
 from contextlib import contextmanager
 import logging
 import datetime
-from scannerpy import ColumnType, DeviceType, Job, ScannerException
-from scannerpy.stdlib import parsers, writers
 import importlib
 from functools import wraps
 
@@ -99,7 +101,7 @@ def ffmpeg_extract(input_path, output_ext=None, output_path=None, segment=None):
 
 
 def imwrite(path, img):
-    cv2 = try_import('cv2', __name__)
+    cv2 = try_import('cv2', 'tixelbox')
     cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 
@@ -139,7 +141,7 @@ def sample_video(delete=True):
         f = tempfile.NamedTemporaryFile(suffix='.mp4')
     else:
         # sample_path = '/tmp/sample_video.mp4'
-        sample_path = 'baby_driver.mp4'
+        sample_path = 'bb2.mp4'
         if os.path.isfile(sample_path):
             yield Video(sample_path)
             return
