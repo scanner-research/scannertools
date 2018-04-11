@@ -9,9 +9,11 @@ Tixelbox is a high-level Python library for scalable video analysis built on the
 * [Shot detection](https://github.com/scanner-research/tixelbox/blob/master/examples/shot_detection.py)
 * [Random frame access](https://github.com/scanner-research/tixelbox/blob/master/examples/frame_montage.py)
 
+See the [documentation](https://scanner-research.github.io/tixelbox/) for details.
+
 ## Usage
 
-Here's an example using Tixelbox to extract faces every 10th frame of a video, and then to draw the bounding boxes on a single frame.
+Here's an example using Tixelbox to extract faces every 10th frame of a video, and then to draw the bounding boxes on one of those frames.
 
 ```python
 import tixelbox as tb
