@@ -1,5 +1,5 @@
 import scannerpy
-import scannerpy.stdlib.parsers as parsers
+import scannerpy.stdlib.readers as readers
 import scannerpy.stdlib.writers as writers
 import scannerpy.stdlib.bboxes as bboxes
 from scannerpy.stdlib.util import default
@@ -15,7 +15,7 @@ class BboxNMSKernel(scannerpy.Kernel):
     def execute(self, input_columns):
         bboxes_list = []
         for c in input_columns:
-            bboxes_list += parsers.bboxes(c, self._protobufs)
+            bboxes_list += readers.bboxes(c, self._protobufs)
 
         nmsed_bboxes = bboxes.nms(bboxes_list, self._threshold)
         return [writers.bboxes(nmsed_bboxes, self._protobufs)]

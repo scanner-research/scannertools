@@ -47,7 +47,9 @@ For more examples, see the [examples](https://github.com/scanner-research/tixelb
 
 ## Installation
 
-Tixelbox requires the Python packages for our three libraries [Scanner](https://github.com/scanner-research/scanner/), [Storehouse](https://github.com/scanner-research/storehouse/), and [Hwang](https://github.com/scanner-research/hwang) to be installed. See each page for respective instructions. Tixelbox has optional dependencies for certain pipelines, namely TensorFlow and OpenCV. With the dependencies installed, just run:
+Tixelbox requires the Python packages for our three libraries [Scanner](https://github.com/scanner-research/scanner/), [Storehouse](https://github.com/scanner-research/storehouse/), and [Hwang](https://github.com/scanner-research/hwang) to be installed. To get these, you can either use our prebuilt Docker image for Scanner `scannerresearch/scanner:cpu`, or you can follow the [installation instructions](https://github.com/scanner-research/scanner/blob/master/INSTALL.md) in the Scanner repository. Note that Tixelbox has optional dependencies for certain pipelines, namely TensorFlow and OpenCV.
+
+With the dependencies installed, just run:
 
 ```
 pip install tixelbox

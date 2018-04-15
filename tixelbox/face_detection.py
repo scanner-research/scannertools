@@ -1,6 +1,6 @@
 from prelude import *
 from scannerpy import ScannerException
-from scannerpy.stdlib import NetDescriptor, parsers
+from scannerpy.stdlib import NetDescriptor, readers
 from scannerpy.stdlib.util import download_temp_file, temp_directory
 from scannerpy.stdlib.bboxes import proto_to_np
 import os
@@ -125,7 +125,7 @@ def detect_faces(db, videos, frames=None):
 
     output_tables = [db.table(n) for n in output_names]
     all_bboxes = [
-        list(output_table.column('nmsed_bboxes').load(parsers.bboxes))
+        list(output_table.column('nmsed_bboxes').load(readers.bboxes))
         for output_table in output_tables
     ]
 

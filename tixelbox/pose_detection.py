@@ -5,9 +5,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 @autobatch(uniforms=[0, 'cache', 'models_path', 'batch'])
-def detect_poses(db, video, frames=None, models_path=None, batch=1):
+def detect_poses(db, videos, frames=None, models_path=None, batch=1):
     """
-    detect_poses(video, frames=None, models_path=None, batch=1)
+    detect_poses(db, videos, frames=None, models_path=None, batch=1)
     WIP, don't use
     """
 
@@ -80,4 +80,4 @@ def detect_poses(db, video, frames=None, models_path=None, batch=1):
         work_packet_size=8,
         pipeline_instances_per_node=pipeline_instances)
 
-    return [list(t.column('poses').load(parsers.poses)) for t in output_tables]
+    return [list(t.column('poses').load(readers.poses)) for t in output_tables]

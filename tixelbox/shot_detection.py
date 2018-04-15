@@ -58,7 +58,7 @@ def detect_shots(db, videos):
     output_tables = db.run(output, jobs, force=True)
 
     log.debug('Loading histograms')
-    all_hists = [list(t.column('histogram').load(parsers.histograms)) for t in output_tables]
+    all_hists = [list(t.column('histogram').load(readers.histograms)) for t in output_tables]
 
     log.debug('Computing shot boundaries from histograms')
     return [_compute_shot_boundaries(vid_hists) for vid_hists in all_hists]

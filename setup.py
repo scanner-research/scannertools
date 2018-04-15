@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='tixelbox',
-    version='0.1',
+    version='0.1.0',
     description='Video analytics toolkit',
     url='http://github.com/scanner-research/tixelbox',
     author='Alex Poms and Will Crichton',

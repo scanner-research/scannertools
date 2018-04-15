@@ -84,7 +84,7 @@ def detect_objects(db, videos, frames=None, nms_threshold=None):
     all_bboxes = [
         list(
             output_table.column('nmsed_bboxes' if nms_threshold is not None else 'bboxes').load(
-                parsers.bboxes)) for output_table in output_tables
+                readers.bboxes)) for output_table in output_tables
     ]
 
     return all_bboxes

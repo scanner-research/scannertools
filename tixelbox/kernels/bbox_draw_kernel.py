@@ -1,6 +1,7 @@
 import PIL.ImageDraw as ImageDraw
 import scannerpy
 from scannerpy.stdlib import parsers
+from scannerpy.stdlib import readers
 from scannerpy.stdlib.util import default, temp_directory
 from scannerpy.stdlib.bboxes import proto_to_np
 import numpy as np
@@ -20,7 +21,7 @@ class BboxDrawKernel(scannerpy.Kernel):
 
     def execute(self, input_columns):
         [frame, bboxes] = input_columns
-        bboxes = parsers.bboxes(bboxes, self._protobufs)
+        bboxes = readers.bboxes(bboxes, self._protobufs)
 
         if len(bboxes) == 0:
             return [frame]

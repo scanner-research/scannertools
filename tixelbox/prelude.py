@@ -6,7 +6,7 @@ import storehouse
 import hwang
 import scannerpy
 from scannerpy import ColumnType, DeviceType, Job, ScannerException
-from scannerpy.stdlib import parsers, writers
+from scannerpy.stdlib import readers, writers
 import tempfile
 import subprocess as sp
 import os
