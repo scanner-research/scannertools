@@ -29,7 +29,7 @@ def try_import(to_import, current_module):
             format(current_module, to_import))
 
 
-log = logging.getLogger('tixelbox')
+log = logging.getLogger('scannertools')
 log.setLevel(logging.DEBUG)
 if not log.handlers:
 
@@ -101,7 +101,7 @@ def ffmpeg_extract(input_path, output_ext=None, output_path=None, segment=None):
 
 
 def imwrite(path, img):
-    cv2 = try_import('cv2', 'tixelbox')
+    cv2 = try_import('cv2', 'scannertools')
     cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 

@@ -1,10 +1,10 @@
 import pytest
-import tixelbox as tb
-import tixelbox.object_detection as objdet
-import tixelbox.face_detection as facedet
-import tixelbox.optical_flow as optflow
-import tixelbox.shot_detection as shotdet
-import tixelbox.pose_detection as posedet
+import scannertools as st
+import scannertools.object_detection as objdet
+import scannertools.face_detection as facedet
+import scannertools.optical_flow as optflow
+import scannertools.shot_detection as shotdet
+import scannertools.pose_detection as posedet
 import scannerpy
 import os
 import subprocess as sp
@@ -22,7 +22,7 @@ needs_gpu = pytest.mark.skipif(not has_gpu, reason='need GPU to run')
 
 @pytest.fixture(scope='module')
 def video():
-    with tb.sample_video() as video:
+    with st.sample_video() as video:
         yield video
 
 

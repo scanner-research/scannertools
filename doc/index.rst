@@ -1,4 +1,4 @@
-.. tixelbox documentation master file, created by
+.. scannertools documentation master file, created by
    sphinx-quickstart on Sun Apr  1 22:41:48 2018.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
@@ -7,10 +7,10 @@
    :maxdepth: 2
    :caption: Contents:
 
-Tixelbox
+Scannertools
 ====================================
 
-Tixelbox is a high-level Python library for scalable video analysis built on the `Scanner <https://github.com/scanner-research/scanner/>`_ video processing engine. Tixelbox provides easy-to-use, off-the-shelf implementations of:
+Scannertools is a high-level Python library for scalable video analysis built on the `Scanner <https://github.com/scanner-research/scanner/>`_ video processing engine. Scannertools provides easy-to-use, off-the-shelf implementations of:
 
 * :ref:`object-detection`
 * :ref:`face-detection`
@@ -19,16 +19,16 @@ Tixelbox is a high-level Python library for scalable video analysis built on the
 * :ref:`shot-detection`
 * :ref:`random-frame`
 
-Examples are provided below (visuals from `this video <https://www.youtube.com/watch?v=_oLBVF_VYRM>`_). Auto-generated API documentation is `available here. </source/tixelbox.html>`_
+Examples are provided below (visuals from `this video <https://www.youtube.com/watch?v=_oLBVF_VYRM>`_). Auto-generated API documentation is `available here. </source/scannertools.html>`_
 
 .. _object-detection:
 
 Object detection
 -------------------------------------
-Find many kinds of objects (people, cars, chairs, ...) in a video using :func:`~tixelbox.object_detection.detect_objects`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/object_detection.py>`__. ::
+Find many kinds of objects (people, cars, chairs, ...) in a video using :func:`~scannertools.object_detection.detect_objects`. `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/object_detection.py>`__. ::
 
-    import tixelbox.object_detection as objdet
-    import tixelbox.vis as vis
+    import scannertools.object_detection as objdet
+    import scannertools.vis as vis
     bboxes = objdet.detect_objects(db, video)
     vis.draw_bboxes(db, video, bboxes)
 
@@ -41,10 +41,10 @@ Find many kinds of objects (people, cars, chairs, ...) in a video using :func:`~
 
 Face detection
 -------------------------------------
-Find people's faces in a video using :func:`~tixelbox.face_detection.detect_faces`.  `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/face_detection.py>`__. ::
+Find people's faces in a video using :func:`~scannertools.face_detection.detect_faces`.  `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/face_detection.py>`__. ::
 
-    import tixelbox.face_detection as facedet
-    import tixelbox.vis as vis
+    import scannertools.face_detection as facedet
+    import scannertools.vis as vis
     bboxes = facedet.detect_faces(db, video)
     vis.draw_bboxes(db, video, bboxes)
 
@@ -57,10 +57,10 @@ Find people's faces in a video using :func:`~tixelbox.face_detection.detect_face
 
 Pose detection
 -------------------------------------
-Detect people's poses (two-dimensional skeletons) using :func:`~tixelbox.pose_detection.detect_poses`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/pose_detection.py>`__. ::
+Detect people's poses (two-dimensional skeletons) using :func:`~scannertools.pose_detection.detect_poses`. `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/pose_detection.py>`__. ::
 
-    import tixelbox.pose_detection as posedet
-    import tixelbox.vis as vis
+    import scannertools.pose_detection as posedet
+    import scannertools.vis as vis
     poses = posedet.detect_poses(db, video)
     vis.draw_poses(db, video, poses)
 
@@ -70,10 +70,10 @@ Example video coming soon!
 
 Optical flow
 -------------------------------------
-Compute dense motion vectors between frames with :func:`~tixelbox.optical_flow.compute_flow`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/optical_flow.py>`__. ::
+Compute dense motion vectors between frames with :func:`~scannertools.optical_flow.compute_flow`. `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/optical_flow.py>`__. ::
 
-    import tixelbox.optical_flow as optflow
-    import tixelbox.vis as vis
+    import scannertools.optical_flow as optflow
+    import scannertools.vis as vis
     flow_fields = optflow.compute_flow(db, video)
     vis.draw_flow_fields(db, video, flow_fields)
 
@@ -85,9 +85,9 @@ Compute dense motion vectors between frames with :func:`~tixelbox.optical_flow.c
 
 Shot detection
 -------------------------------------
-Find shot changes in a video using :func:`~tixelbox.shot_detection.detect_shots`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/shot_detection.py>`__. ::
+Find shot changes in a video using :func:`~scannertools.shot_detection.detect_shots`. `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/shot_detection.py>`__. ::
 
-    import tixelbox.shot_detection as shotdet
+    import scannertools.shot_detection as shotdet
     shots = shotdet.detect_shots(db, video)
     montage_img = video.montage(shots)
     tb.imwrite('shots.jpg', montage_img)
@@ -99,7 +99,7 @@ Find shot changes in a video using :func:`~tixelbox.shot_detection.detect_shots`
 
 Random frame access
 -------------------------------------
-Extract individual frames from a video with low overhead using :meth:`tixelbox.video.Video.frame <Video.frame>`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/frame_montage.py>`__. ::
+Extract individual frames from a video with low overhead using :meth:`scannertools.video.Video.frame <Video.frame>`. `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/frame_montage.py>`__. ::
 
     frame = video.frame(0)
     tb.imwrite('frame0.jpg', frame)

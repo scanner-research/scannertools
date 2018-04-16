@@ -1,13 +1,13 @@
 from setuptools import setup
 
 setup(
-    name='tixelbox',
+    name='scannertools',
     version='0.1.3',
     description='Video analytics toolkit',
-    url='http://github.com/scanner-research/tixelbox',
+    url='http://github.com/scanner-research/scannertools',
     author='Alex Poms and Will Crichton',
     author_email='apoms@cs.stanford.edu',
     license='Apache 2.0',
-    packages=['tixelbox', 'tixelbox.kernels'],
+    packages=['scannertools', 'scannertools.kernels'],
     install_requires=['requests', 'numpy', 'scipy', 'requests'],
     zip_safe=False)

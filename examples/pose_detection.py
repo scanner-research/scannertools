@@ -1,10 +1,10 @@
-import tixelbox as tb
-import tixelbox.pose_detection as posedet
-import tixelbox.vis as vis
+import scannertools as st
+import scannertools.pose_detection as posedet
+import scannertools.vis as vis
 import scannerpy
 import os
 
-with tb.sample_video() as video:
+with st.sample_video() as video:
     db = scannerpy.Database()
     frames = [0, 100, 200]
     poses = posedet.detect_poses(db, video, frames)
