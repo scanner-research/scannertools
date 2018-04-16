@@ -3,9 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
 Tixelbox
 ====================================
-
 
 Tixelbox is a high-level Python library for scalable video analysis built on the `Scanner <https://github.com/scanner-research/scanner/>`_ video processing engine. Tixelbox provides easy-to-use, off-the-shelf implementations of:
 
@@ -15,6 +18,8 @@ Tixelbox is a high-level Python library for scalable video analysis built on the
 * :ref:`optical-flow`
 * :ref:`shot-detection`
 * :ref:`random-frame`
+
+Examples are provided below (visuals from `this video <https://www.youtube.com/watch?v=_oLBVF_VYRM>`_). Auto-generated API documentation is `available here. </source/tixelbox.html>`_
 
 .. _object-detection:
 
@@ -100,7 +105,3 @@ Extract individual frames from a video with low overhead using :meth:`tixelbox.v
     tb.imwrite('frame0.jpg', frame)
 
 .. image:: https://storage.googleapis.com/scanner-data/public/sample-frame.jpg
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:

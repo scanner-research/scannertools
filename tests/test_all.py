@@ -14,7 +14,7 @@ import toml
 try:
     sp.check_call(['nvidia-smi'])
     has_gpu = True
-except OSError:
+except (OSError, sp.CalledProcessError):
     has_gpu = False
 
 needs_gpu = pytest.mark.skipif(not has_gpu, reason='need GPU to run')
