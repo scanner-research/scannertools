@@ -4,7 +4,8 @@ import tixelbox.vis as vis
 import scannerpy
 import os
 
-with tb.WithMany(scannerpy.Database(), tb.sample_video(delete=False)) as (db, video):
+with tb.sample_video(delete=False) as video:
+    db = scannerpy.Database()
     frames = None  #list(range(0, video.num_frames(), 3))
     bboxes = objdet.detect_objects(db, video, frames)
     vis.draw_bboxes(db, video, bboxes, frames, path='sample_objects.mp4')

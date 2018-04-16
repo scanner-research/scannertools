@@ -34,7 +34,6 @@ import six
 import re
 
 from prelude import *
-tf = try_import('tensorflow', __name__)
 
 _TITLE_LEFT_MARGIN = 10
 _TITLE_TOP_MARGIN = 10
@@ -105,6 +104,7 @@ def save_image_array_as_png(image, output_path):
     image: a numpy array with shape [height, width, 3].
     output_path: path to which image should be written.
   """
+    tf = try_import('tensorflow', __name__)
     image_pil = Image.fromarray(np.uint8(image)).convert('RGB')
     with tf.gfile.Open(output_path, 'w') as fid:
         image_pil.save(fid, 'PNG')
@@ -311,6 +311,7 @@ def draw_bounding_boxes_on_image_tensors(images,
   Returns:
     4D image tensor of type uint8, with boxes drawn on top.
   """
+    tf = try_import('tensorflow', __name__)
     visualize_boxes_fn = functools.partial(
         visualize_boxes_and_labels_on_image_array,
         category_index=category_index,

@@ -1,6 +1,5 @@
 import PIL.ImageDraw as ImageDraw
 import scannerpy
-from scannerpy.stdlib import parsers
 from scannerpy.stdlib import readers
 from scannerpy.stdlib.util import default, temp_directory
 from scannerpy.stdlib.bboxes import proto_to_np

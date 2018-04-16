@@ -3,7 +3,8 @@ import tixelbox.shot_detection as shotdet
 import scannerpy
 import os
 
-with tb.WithMany(scannerpy.Database(), tb.sample_video()) as (db, video):
+with tb.sample_video() as video:
+    db = scannerpy.Database()
     shots = shotdet.detect_shots(db, video)
     montage_img = video.montage(shots)
     tb.imwrite('sample_shots.jpg', montage_img)

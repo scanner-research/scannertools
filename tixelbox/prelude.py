@@ -119,8 +119,12 @@ def autobatch(uniforms=[]):
 
             batched = isinstance(nonuniform, list)
             if not batched:
-                args = [[x] if i not in positions else x for (i, x) in enumerate(args)]
-                kwargs = {k: [v] if k not in keywords else v for k, v in kwargs.iteritems()}
+                args = [[x] if i not in positions and x is not None else x
+                        for (i, x) in enumerate(args)]
+                kwargs = {
+                    k: [v] if k not in keywords and v is not None else v
+                    for k, v in kwargs.iteritems()
+                }
 
             res = fn(*args, **kwargs)
             return res[0] if not batched else res
@@ -135,13 +139,12 @@ def sample_video(delete=True):
     import requests
     from video import Video
 
-    url = "https://storage.googleapis.com/scanner-data/test/short_video.mp4"
+    url = "https://storage.googleapis.com/scanner-data/public/sample-clip.mp4"
 
     if delete:
         f = tempfile.NamedTemporaryFile(suffix='.mp4')
     else:
-        # sample_path = '/tmp/sample_video.mp4'
-        sample_path = 'bb2.mp4'
+        sample_path = '/tmp/sample_video.mp4'
         if os.path.isfile(sample_path):
             yield Video(sample_path)
             return
@@ -178,7 +181,9 @@ def tile(imgs, rows=None, cols=None):
 def scanner_ingest(db, videos):
     videos = [v for v in videos if not db.has_table(v.scanner_name())]
     if len(videos) > 0:
-        db.ingest_videos([(v.scanner_name(), v.path()) for v in videos], inplace=True)
+        # TODO(wcrichto): change this to inplace=True once
+        # https://github.com/scanner-research/scanner/issues/162 is fixed.
+        db.ingest_videos([(v.scanner_name(), v.path()) for v in videos])
 
 
 class WithMany:

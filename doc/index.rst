@@ -6,7 +6,8 @@
 Tixelbox
 ====================================
 
-Tixelbox is a high-level Python library for scalable video analysis built on the Scanner video processing engine. Tixelbox is not an ffmpeg replacement--its primary purpose is analysis, not transcoding. Tixelbox provides easy-to-use, off-the-shelf implementations of various video processing algorithms:
+
+Tixelbox is a high-level Python library for scalable video analysis built on the `Scanner <https://github.com/scanner-research/scanner/>`_ video processing engine. Tixelbox provides easy-to-use, off-the-shelf implementations of:
 
 * :ref:`object-detection`
 * :ref:`face-detection`
@@ -19,49 +20,87 @@ Tixelbox is a high-level Python library for scalable video analysis built on the
 
 Object detection
 -------------------------------------
-Find many kinds of objects (people, cars, chairs, ...) in a video using :func:`~tixelbox.object_detection.detect_objects`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/object_detection.py>`__.
+Find many kinds of objects (people, cars, chairs, ...) in a video using :func:`~tixelbox.object_detection.detect_objects`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/object_detection.py>`__. ::
+
+    import tixelbox.object_detection as objdet
+    import tixelbox.vis as vis
+    bboxes = objdet.detect_objects(db, video)
+    vis.draw_bboxes(db, video, bboxes)
+
+.. raw:: html
+
+         <iframe width="560" height="315" src="https://www.youtube.com/embed/6xt-YVFCC9I" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
 
 
 .. _face-detection:
 
 Face detection
 -------------------------------------
-Find people's faces in a video using :func:`~tixelbox.face_detection.detect_faces`.  `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/face_detection.py>`__.
+Find people's faces in a video using :func:`~tixelbox.face_detection.detect_faces`.  `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/face_detection.py>`__. ::
+
+    import tixelbox.face_detection as facedet
+    import tixelbox.vis as vis
+    bboxes = facedet.detect_faces(db, video)
+    vis.draw_bboxes(db, video, bboxes)
+
+.. raw:: html
+
+         <iframe width="560" height="315" src="https://www.youtube.com/embed/IQsb_nbPf9M" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
 
 
 .. _pose-detection:
 
 Pose detection
 -------------------------------------
-Detect people's poses (two-dimensional skeletons) using :func:`~tixelbox.pose_detection.detect_poses`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/pose_detection.py>`__.
+Detect people's poses (two-dimensional skeletons) using :func:`~tixelbox.pose_detection.detect_poses`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/pose_detection.py>`__. ::
 
+    import tixelbox.pose_detection as posedet
+    import tixelbox.vis as vis
+    poses = posedet.detect_poses(db, video)
+    vis.draw_poses(db, video, poses)
+
+Example video coming soon!
 
 .. _optical-flow:
 
 Optical flow
 -------------------------------------
-Compute dense motion vectors between frames with :func:`~tixelbox.optical_flow.compute_flow`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/optical_flow.py>`__.
+Compute dense motion vectors between frames with :func:`~tixelbox.optical_flow.compute_flow`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/optical_flow.py>`__. ::
+
+    import tixelbox.optical_flow as optflow
+    import tixelbox.vis as vis
+    flow_fields = optflow.compute_flow(db, video)
+    vis.draw_flow_fields(db, video, flow_fields)
+
+.. raw:: html
+
+         <iframe width="560" height="315" src="https://www.youtube.com/embed/ru048EWgc2Y" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
 
 .. _shot-detection:
 
 Shot detection
 -------------------------------------
-Find shot changes in a video using :func:`~tixelbox.shot_detection.detect_shots`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/shot_detection.py>`__.
+Find shot changes in a video using :func:`~tixelbox.shot_detection.detect_shots`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/shot_detection.py>`__. ::
+
+    import tixelbox.shot_detection as shotdet
+    shots = shotdet.detect_shots(db, video)
+    montage_img = video.montage(shots)
+    tb.imwrite('shots.jpg', montage_img)
+
+.. image:: https://storage.googleapis.com/scanner-data/public/sample-shots-small.jpg
+   :target: https://storage.googleapis.com/scanner-data/public/sample-shots.jpg
 
 .. _random-frame:
 
 Random frame access
 -------------------------------------
-Extract individual frames from a video with low overhead using :meth:`~tixelbox.video.Video.frame`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/frame_montage.py>`__.
+Extract individual frames from a video with low overhead using :meth:`tixelbox.video.Video.frame <Video.frame>`. `Full example here <https://github.com/scanner-research/tixelbox/blob/master/examples/frame_montage.py>`__. ::
 
+    frame = video.frame(0)
+    tb.imwrite('frame0.jpg', frame)
+
+.. image:: https://storage.googleapis.com/scanner-data/public/sample-frame.jpg
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

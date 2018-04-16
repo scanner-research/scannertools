@@ -4,8 +4,6 @@ import os
 import tarfile
 import pickle
 
-try_import('tensorflow', __name__)
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_NAME = 'ssd_mobilenet_v1_coco_2017_11_17'
@@ -32,6 +30,8 @@ def detect_objects(db, videos, frames=None, nms_threshold=None):
     Returns:
         List[List[BoundingBox]] (autobatched): List of bounding boxes for each frame.
     """
+
+    try_import('tensorflow', __name__)
 
     if not os.path.isdir(os.path.join(temp_directory(), MODEL_NAME)):
         log.debug('Downloading model')

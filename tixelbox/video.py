@@ -16,7 +16,10 @@ class Video:
         """
 
         self._path = path
-        video_file = storehouse.RandomReadFile(get_storage(), path.encode('ascii'))
+        try:
+            video_file = storehouse.RandomReadFile(get_storage(), path.encode('ascii'))
+        except UserWarning:
+            raise Exception('Path to video `{}` does not exist.'.format(path))
         self._decoder = hwang.Decoder(video_file)
 
     def path(self):
