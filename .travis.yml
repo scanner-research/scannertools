@@ -8,7 +8,7 @@ before_install:
   - docker pull scannerresearch/scanner:cpu
 
 script:
-  - docker run -w /app -v $(pwd):/app -d scannerresearch/scanner:cpu ./travis.sh
+  - docker run -w /app -v $(pwd):/app scannerresearch/scanner:cpu ./travis.sh
 
 after_success:
   - travis-sphinx deploy
