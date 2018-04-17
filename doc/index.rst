@@ -7,7 +7,7 @@
    :maxdepth: 2
    :caption: Contents:
 
-Scannertools
+scannertools
 ====================================
 
 Scannertools is a high-level Python library for scalable video analysis built on the `Scanner <https://github.com/scanner-research/scanner/>`_ video processing engine. Scannertools provides easy-to-use, off-the-shelf implementations of:

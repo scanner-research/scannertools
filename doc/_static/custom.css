@@ -1,3 +1,45 @@
 pre {
     padding: 7px 15px;
 }
+
+div.document {
+    position: relative;
+}
+
+div.sphinxsidebar {
+    position: absolute;
+    margin: 0;
+    left: 0;
+    top: 0;
+    height: 100%;
+}
+
+div.sphinxsidebarwrapper {
+    position: sticky;
+    left: 0;
+    top: 15px;
+}
+
+div.related {
+    display: none;
+}
+
+div.body {
+    color: rgb(42, 45, 50);
+}
+
+div.body a.reference, .sphinxsidebar li a {
+    color: #900;
+    border-bottom: 1px dotted #900;
+}
+
+div.body a.reference:visited, .sphinxsidebar li a:visited {
+    color: #700;
+    border-bottom: 1px dotted #700;
+}
+
+div.body a.reference:hover, .sphinxsidebar li a:hover {
+    color: #d00;
+    text-decoration: none;
+    border-bottom-color: #d00;
+}
