@@ -19,7 +19,7 @@ Scannertools is a high-level Python library for scalable video analysis built on
 * :ref:`shot-detection`
 * :ref:`random-frame`
 
-Examples are provided below (visuals from `this video <https://www.youtube.com/watch?v=_oLBVF_VYRM>`_). Auto-generated API documentation is `available here. </source/scannertools.html>`_
+Examples are provided below (visuals from `this video <https://www.youtube.com/watch?v=_oLBVF_VYRM>`_). Auto-generated API documentation is `available here. <source/scannertools.html>`_
 
 .. _object-detection:
 
