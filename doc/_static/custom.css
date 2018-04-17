@@ -28,18 +28,35 @@ div.body {
     color: rgb(42, 45, 50);
 }
 
-div.body a.reference, .sphinxsidebar li a {
+div.body a.reference span, .sphinxsidebar li a {
     color: #900;
     border-bottom: 1px dotted #900;
 }
 
-div.body a.reference:visited, .sphinxsidebar li a:visited {
+div.body a.reference:visited span, .sphinxsidebar li a:visited {
     color: #700;
     border-bottom: 1px dotted #700;
 }
 
-div.body a.reference:hover, .sphinxsidebar li a:hover {
+div.body a.reference:hover {
+    text-decoration: none;
+}
+
+div.body a.reference:hover span, .sphinxsidebar li a:hover {
     color: #d00;
     text-decoration: none;
     border-bottom-color: #d00;
+}
+
+div.body code.xref span {
+    font-weight: bold;
+    border: none !important;
+    color: black !important;
+}
+
+div.body code.xref:hover span {
+    border: none !important;
+    color: black !important;
+    text-decoration: none !important;
+    background: #eee;
 }
