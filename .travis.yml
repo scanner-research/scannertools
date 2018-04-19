@@ -1,10 +1,10 @@
 sudo: required
-language: python
+language: python3
 services:
   - docker
 
 before_install:
-  - pip install travis-sphinx
+  - pip3 install travis-sphinx
   - docker pull scannerresearch/scanner:cpu
 
 script:
