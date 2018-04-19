@@ -42,35 +42,35 @@ class Video:
         Returns:
             int: Width in pixels of the video.
         """
-        return self._decoder.video_index.frame_width
+        return self._decoder.video_index.frame_width()
 
     def height(self):
         """
         Returns:
             int: Height in pixels of the video.
         """
-        return self._decoder.video_index.frame_height
+        return self._decoder.video_index.frame_height()
 
     def fps(self):
         """
         Returns:
             float: Frames per seconds of the video.
         """
-        return self._decoder.video_index.fps
+        return self._decoder.video_index.fps()
 
     def num_frames(self):
         """
         Returns:
             int: Number of frames in the video.
         """
-        return self._decoder.video_index.frames
+        return self._decoder.video_index.frames()
 
     def duration(self):
         """
         Returns:
             int: Length of the video in seconds.
         """
-        return self._decoder.video_index.duration
+        return self._decoder.video_index.duration()
 
     def frame(self, number=None, time=None):
         """

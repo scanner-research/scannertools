@@ -40,7 +40,7 @@ def db():
     cfg['storage']['db_path'] = tempfile.mkdtemp()
 
     with tempfile.NamedTemporaryFile() as cfg_f:
-        cfg_f.write(toml.dumps(cfg))
+        cfg_f.write(bytes(toml.dumps(cfg), 'utf-8'))
         cfg_f.flush()
 
         with scannerpy.Database(config_path=cfg_f.name) as db:

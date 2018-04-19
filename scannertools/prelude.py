@@ -166,9 +166,9 @@ def tile(imgs, rows=None, cols=None):
         rows = int(math.sqrt(len(imgs)))
 
     if rows is None:
-        rows = (len(imgs) + cols - 1) / cols
+        rows = (len(imgs) + cols - 1) // cols
     else:
-        cols = (len(imgs) + rows - 1) / rows
+        cols = (len(imgs) + rows - 1) // rows
 
     # Pad missing frames with black
     diff = rows * cols - len(imgs)
