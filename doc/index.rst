@@ -1,12 +1,3 @@
-.. scannertools documentation master file, created by
-   sphinx-quickstart on Sun Apr  1 22:41:48 2018.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
-
 scannertools
 ====================================
 
@@ -99,7 +90,7 @@ Find shot changes in a video using :func:`~scannertools.shot_detection.detect_sh
 
 Random frame access
 -------------------------------------
-Extract individual frames from a video with low overhead using :meth:`scannertools.video.Video.frame <Video.frame>`. `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/frame_montage.py>`__. ::
+Extract individual frames from a video with low overhead using :meth:`Video.frame <scannertools.video.Video.frame>`. `Full example here <https://github.com/scanner-research/scannertools/blob/master/examples/frame_montage.py>`__. ::
 
     frame = video.frame(0)
     tb.imwrite('frame0.jpg', frame)
