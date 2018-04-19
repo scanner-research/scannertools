@@ -1,4 +1,4 @@
-from prelude import *
+from .prelude import *
 from scannerpy.stdlib.util import temp_directory, download_temp_file
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

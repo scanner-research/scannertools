@@ -1,4 +1,4 @@
-from prelude import *
+from .prelude import *
 from scannerpy.stdlib.util import download_temp_file, temp_directory
 import os
 import tarfile

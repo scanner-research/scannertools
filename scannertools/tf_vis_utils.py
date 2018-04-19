@@ -33,7 +33,7 @@ import PIL.ImageFont as ImageFont
 import six
 import re
 
-from prelude import *
+from .prelude import *
 
 _TITLE_LEFT_MARGIN = 10
 _TITLE_TOP_MARGIN = 10
@@ -478,7 +478,7 @@ def visualize_boxes_and_labels_on_image_array(image,
                 box_to_color_map[box] = 'black'
             else:
                 if not agnostic_mode:
-                    if classes[i] in category_index.keys():
+                    if classes[i] in list(category_index.keys()):
                         class_name = category_index[classes[i]]['name']
                     else:
                         class_name = 'N/A'
@@ -492,7 +492,7 @@ def visualize_boxes_and_labels_on_image_array(image,
                     box_to_color_map[box] = STANDARD_COLORS[classes[i] % len(STANDARD_COLORS)]
 
     # Draw all boxes onto image.
-    for box, color in box_to_color_map.items():
+    for box, color in list(box_to_color_map.items()):
         ymin, xmin, ymax, xmax = box
         if instance_masks is not None:
             draw_mask_on_image_array(image, box_to_instance_masks_map[box], color=color)

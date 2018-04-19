@@ -1,4 +1,4 @@
-from prelude import *
+from .prelude import *
 import os
 import pickle
 

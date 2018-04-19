@@ -1,9 +1,9 @@
-from prelude import WithMany, init_storage, sample_video, imwrite
-from video import Video
-from audio import Audio
-import pose_detection
-import shot_detection
-import object_detection
-import optical_flow
-import tf_vis_utils
-import vis
+from .prelude import WithMany, init_storage, sample_video, imwrite
+from .video import Video
+from .audio import Audio
+from . import pose_detection
+from . import shot_detection
+from . import object_detection
+from . import optical_flow
+from . import tf_vis_utils
+from . import vis

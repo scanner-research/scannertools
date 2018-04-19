@@ -3,12 +3,10 @@ import scannerpy
 from scannerpy.stdlib import readers
 from scannerpy.stdlib.util import default, temp_directory
 from scannerpy.stdlib.bboxes import proto_to_np
+from scannertools import tf_vis_utils
 import numpy as np
 import pickle
-from tixelbox import tf_vis_utils
 import os
-import cv2
-import PIL.Image as Image
 
 
 class BboxDrawKernel(scannerpy.Kernel):

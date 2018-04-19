@@ -1,4 +1,4 @@
-from prelude import *
+from .prelude import *
 from scannerpy.stdlib import writers
 import pickle
 

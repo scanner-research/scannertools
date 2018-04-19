@@ -1,4 +1,4 @@
-from prelude import *
+from .prelude import *
 from scannerpy import ScannerException
 from scannerpy.stdlib import NetDescriptor, readers
 from scannerpy.stdlib.util import download_temp_file, temp_directory

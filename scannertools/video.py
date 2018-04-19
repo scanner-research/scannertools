@@ -1,5 +1,5 @@
-from prelude import *
-from audio import Audio
+from .prelude import *
+from .audio import Audio
 
 
 class Video:

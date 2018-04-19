@@ -123,7 +123,7 @@ def autobatch(uniforms=[]):
                         for (i, x) in enumerate(args)]
                 kwargs = {
                     k: [v] if k not in keywords and v is not None else v
-                    for k, v in kwargs.iteritems()
+                    for k, v in kwargs.items()
                 }
 
             res = fn(*args, **kwargs)
@@ -137,7 +137,7 @@ def autobatch(uniforms=[]):
 @contextmanager
 def sample_video(delete=True):
     import requests
-    from video import Video
+    from .video import Video
 
     url = "https://storage.googleapis.com/scanner-data/public/sample-clip.mp4"
 
