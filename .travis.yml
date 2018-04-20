@@ -6,6 +6,10 @@ sudo: required
 services:
   - docker
 
+env:
+  - LC_ALL=C.UTF-8
+  - LANG=C.UTF-8
+
 before_install:
   - pip3 install travis-sphinx
   - docker pull scannerresearch/scanner:cpu
