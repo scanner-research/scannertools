@@ -11,8 +11,7 @@ import os
 
 class BboxDrawKernel(scannerpy.Kernel):
     def __init__(self, config, protobufs):
-        categories = tf_vis_utils.parse_labelmap(
-            os.path.join(temp_directory(), 'mscoco_label_map.pbtxt'))
+        categories = tf_vis_utils.parse_labelmap(config.args['label_path'])
         self._category_index = tf_vis_utils.create_category_index(categories)
         self._protobufs = protobufs
 

@@ -1,5 +1,6 @@
 from .prelude import *
 from scannerpy.stdlib import writers
+from scannerpy.stdlib.util import download_temp_file
 import pickle
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -82,6 +83,10 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
         str: Path to output video.
     """
 
+    label_path = download_temp_file(
+        'https://raw.githubusercontent.com/tensorflow/models/master/research/object_detection/data/mscoco_label_map.pbtxt'
+    )
+
     log.debug('Ingesting video')
     scanner_ingest(db, videos)
 
@@ -102,7 +107,7 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
     frame = db.sources.FrameColumn()
     frame_sampled = frame.sample()
     bboxes = db.sources.Column()
-    frame_drawn = db.ops.BboxDraw(frame=frame_sampled, bboxes=bboxes)
+    frame_drawn = db.ops.BboxDraw(frame=frame_sampled, bboxes=bboxes, label_path=label_path)
     output = db.sinks.Column(columns={'frame': frame_drawn})
 
     log.debug('Running draw bboxes Scanner job')
@@ -125,7 +130,7 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
 
     log.debug('Saving output video')
     for (video, p) in zip(videos, path):
-        db.table(v.scanner_name() + '_tmp').column('frame').save_mp4(os.path.splitext(p)[0])
+        db.table(video.scanner_name() + '_tmp').column('frame').save_mp4(os.path.splitext(p)[0])
 
     return path
 
