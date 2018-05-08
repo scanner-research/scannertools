@@ -5,7 +5,7 @@ import storehouse
 # that protobufs are being re-registered.
 import hwang
 import scannerpy
-from scannerpy import ColumnType, DeviceType, Job, ScannerException
+from scannerpy import ColumnType, DeviceType, Job, ScannerException, FrameType
 from scannerpy.stdlib import readers, writers
 import tempfile
 import subprocess as sp

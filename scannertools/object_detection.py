@@ -1,8 +1,12 @@
 from .prelude import *
+from . import bboxes
 from scannerpy.stdlib.util import download_temp_file, temp_directory
+from scannerpy.stdlib import tensorflow, writers
+from scannerpy import FrameType
 import os
 import tarfile
-import pickle
+import numpy as np
+import tensorflow as tf
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -11,6 +15,43 @@ MODEL_FILE = MODEL_NAME + '.tar.gz'
 DOWNLOAD_BASE = 'http://download.tensorflow.org/models/object_detection/'
 
 LABEL_URL = 'https://storage.googleapis.com/scanner-data/public/mscoco_label_map.pbtxt'
+
+GRAPH_PATH = os.path.join(
+    os.path.expanduser('~/.scanner/resources'), 'ssd_mobilenet_v1_coco_2017_11_17',
+    'frozen_inference_graph.pb')
+
+
+@scannerpy.register_python_op()
+class ObjDetect(tensorflow.TensorFlowKernel):
+    def build_graph(self):
+        dnn = tf.Graph()
+        with dnn.as_default():
+            od_graph_def = tf.GraphDef()
+            with tf.gfile.GFile(GRAPH_PATH, 'rb') as fid:
+                serialized_graph = fid.read()
+                od_graph_def.ParseFromString(serialized_graph)
+                tf.import_graph_def(od_graph_def, name='')
+        return dnn
+
+    # Evaluate object detection DNN model on a frame
+    # Return bounding box position, class and score
+    def execute(self, frame: FrameType) -> bytes:
+        image_tensor = self.graph.get_tensor_by_name('image_tensor:0')
+        boxes = self.graph.get_tensor_by_name('detection_boxes:0')
+        scores = self.graph.get_tensor_by_name('detection_scores:0')
+        classes = self.graph.get_tensor_by_name('detection_classes:0')
+        with self.graph.as_default():
+            (boxes, scores, classes) = self.sess.run(
+                [boxes, scores, classes], feed_dict={image_tensor: np.expand_dims(frame, axis=0)})
+
+            bboxes = [
+                self.protobufs.BoundingBox(
+                    x1=box[1], y1=box[0], x2=box[3], y2=box[2], score=score, label=cls)
+                for (box, score, cls) in zip(
+                    boxes.reshape(100, 4), scores.reshape(100, 1), classes.reshape(100, 1))
+            ]
+
+            return writers.bboxes(bboxes, self.protobufs)
 
 
 @autobatch(uniforms=[0, 'nms_threshold'])
@@ -42,21 +83,6 @@ def detect_objects(db, videos, frames=None, nms_threshold=None):
 
     log.debug('Ingesting video')
     scanner_ingest(db, videos)
-
-    log.debug('Registering kernel')
-    try:
-        db.register_op('ObjDetect', [('frame', ColumnType.Video)], ['bboxes'])
-        db.register_python_kernel('ObjDetect', DeviceType.CPU,
-                                  SCRIPT_DIR + '/kernels/obj_detect_kernel.py')
-    except ScannerException:
-        pass
-
-    try:
-        db.register_op('BboxNMS', [], ['nmsed_bboxes'], variadic_inputs=True)
-        db.register_python_kernel('BboxNMS', DeviceType.CPU,
-                                  SCRIPT_DIR + '/kernels/bbox_nms_kernel.py')
-    except ScannerException:
-        pass
 
     frame = db.sources.FrameColumn()
     frame_sampled = frame.sample()

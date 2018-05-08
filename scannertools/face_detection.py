@@ -1,4 +1,5 @@
 from .prelude import *
+from . import bboxes
 from scannerpy import ScannerException
 from scannerpy.stdlib import NetDescriptor, readers
 from scannerpy.stdlib.util import download_temp_file, temp_directory
@@ -48,7 +49,7 @@ def detect_faces(db, videos, frames=None):
     caffe_args = facenet_args.caffe_args
     caffe_args.net_descriptor.CopyFrom(descriptor.as_proto())
 
-    if db.has_gpu():
+    if db.has_gpu() and False:
         device = DeviceType.GPU
         pipeline_instances = -1
     else:
@@ -99,14 +100,6 @@ def detect_faces(db, videos, frames=None):
 
         output = [db.table('{}_{}'.format(output_name, scale)) for output_name in output_names]
         outputs.append(output)
-
-    # Register nms bbox op and kernel
-    try:
-        db.register_op('BboxNMS', [], ['nmsed_bboxes'], variadic_inputs=True)
-        db.register_python_kernel('BboxNMS', DeviceType.CPU,
-                                  SCRIPT_DIR + '/kernels/bbox_nms_kernel.py')
-    except ScannerException:
-        pass
 
     bbox_inputs = [db.sources.Column() for _ in outputs]
     nmsed_bboxes = db.ops.BboxNMS(*bbox_inputs, threshold=0.1)
