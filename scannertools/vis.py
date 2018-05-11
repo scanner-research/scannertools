@@ -158,13 +158,8 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
 
 @scannerpy.register_python_op(name='PoseDraw')
 def pose_draw(config, frame: FrameType, poses: bytes) -> FrameType:
-    for all_pose in readers.poses(poses, config.protobufs):
-        pose = all_pose.pose_keypoints()
-        for i in range(18):
-            if pose[i, 2] < 0.35: continue
-            x = int(pose[i, 0] * frame.shape[1])
-            y = int(pose[i, 1] * frame.shape[0])
-            cv2.circle(frame, (x, y), 8, (255, 0, 0), 3)
+    for pose in readers.poses(poses, config.protobufs):
+        pose.draw(frame)
     return frame
 
 
@@ -174,7 +169,10 @@ def draw_poses(db, videos, poses, frames=None, path=None):
     scanner_ingest(db, videos)
 
     for (video, vid_poses) in zip(videos, poses):
-        db.new_table(video.scanner_name() + '_poses_draw', ['poses'], [[p] for p in vid_poses], fns=[writers.poses], force=True)
+        db.new_table(
+            video.scanner_name() + '_poses_draw', ['poses'], [[p] for p in vid_poses],
+            fns=[writers.poses],
+            force=True)
 
     frame = db.sources.FrameColumn()
     frame_sampled = frame.sample()
@@ -185,12 +183,15 @@ def draw_poses(db, videos, poses, frames=None, path=None):
     jobs = [
         Job(
             op_args={
-                frame: db.table(video.scanner_name()).column('frame'),
-                frame_sampled: db.sampler.gather(vid_frames) if vid_frames is not None else db.sampler.all(),
-                poses: db.table(video.scanner_name() + '_poses_draw').column('poses'),
-                output: video.scanner_name() + '_tmp'
-            })
-        for (video, vid_frames) in zip(videos, frames or [None for _ in range(len(videos))])
+                frame:
+                db.table(video.scanner_name()).column('frame'),
+                frame_sampled:
+                db.sampler.gather(vid_frames) if vid_frames is not None else db.sampler.all(),
+                poses:
+                db.table(video.scanner_name() + '_poses_draw').column('poses'),
+                output:
+                video.scanner_name() + '_tmp'
+            }) for (video, vid_frames) in zip(videos, frames or [None for _ in range(len(videos))])
     ]
     log.debug('Running draw poses Scanner job')
     db.run(output, jobs, force=True)
@@ -204,5 +205,5 @@ def draw_poses(db, videos, poses, frames=None, path=None):
     log.debug('Saving output video')
     for (video, p) in zip(videos, path):
         db.table(video.scanner_name() + '_tmp').column('frame').save_mp4(os.path.splitext(p)[0])
-        
+
     return path

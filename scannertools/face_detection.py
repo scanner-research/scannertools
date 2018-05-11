@@ -49,7 +49,7 @@ def detect_faces(db, videos, frames=None):
     caffe_args = facenet_args.caffe_args
     caffe_args.net_descriptor.CopyFrom(descriptor.as_proto())
 
-    if db.has_gpu() and False:
+    if db.has_gpu():
         device = DeviceType.GPU
         pipeline_instances = -1
     else:
