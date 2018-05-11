@@ -55,7 +55,9 @@ Detect people's poses (two-dimensional skeletons) using :func:`~scannertools.pos
     poses = posedet.detect_poses(db, video)
     vis.draw_poses(db, video, poses)
 
-Example video coming soon!
+.. raw:: html
+
+         <iframe width="560" height="315" src="https://www.youtube.com/embed/N1bT1yjnvMY" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
 
 .. _optical-flow:
 
