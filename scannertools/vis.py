@@ -157,8 +157,8 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
 
 
 @scannerpy.register_python_op(name='PoseDraw')
-def pose_draw(config, frame: FrameType, frame_poses: bytes) -> FrameType:
-    for all_pose in readers.poses(frame_poses, config.protobufs):
+def pose_draw(config, frame: FrameType, poses: bytes) -> FrameType:
+    for all_pose in readers.poses(poses, config.protobufs):
         pose = all_pose.pose_keypoints()
         for i in range(18):
             if pose[i, 2] < 0.35: continue
@@ -171,10 +171,10 @@ def pose_draw(config, frame: FrameType, frame_poses: bytes) -> FrameType:
 @autobatch(uniforms=[0])
 def draw_poses(db, videos, poses, frames=None, path=None):
     log.debug('Ingesting video')
-    video.add_to_scanner(db)
+    scanner_ingest(db, videos)
 
-    poses_output_name = video.scanner_name() + '_poses_draw'
-    db.new_table(poses_output_name, ['poses'], [[p] for p in poses], fn=writers.poses, force=True)
+    for (video, vid_poses) in zip(videos, poses):
+        db.new_table(video.scanner_name() + '_poses_draw', ['poses'], [[p] for p in vid_poses], fns=[writers.poses], force=True)
 
     frame = db.sources.FrameColumn()
     frame_sampled = frame.sample()
