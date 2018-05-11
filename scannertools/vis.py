@@ -182,17 +182,27 @@ def draw_poses(db, videos, poses, frames=None, path=None):
     frame_drawn = db.ops.PoseDraw(frame=frame_sampled, poses=poses)
     output = db.sinks.Column(columns={'frame': frame_drawn})
 
-    log.debug('Running job')
-    job = Job(
-        op_args={
-            frame: video.scanner_table(db).column('frame'),
-            frame_sampled: db.sampler.gather(frames) if frames is not None else db.sampler.all(),
-            poses: db.table(poses_output_name).column('poses'),
-            output: 'tmp'
-        })
-    db.run(BulkJob(output=output, jobs=[job]), force=True)
+    jobs = [
+        Job(
+            op_args={
+                frame: db.table(video.scanner_name()).column('frame'),
+                frame_sampled: db.sampler.gather(vid_frames) if vid_frames is not None else db.sampler.all(),
+                poses: db.table(video.scanner_name() + '_poses_draw').column('poses'),
+                output: video.scanner_name() + '_tmp'
+            })
+        for (video, vid_frames) in zip(videos, frames or [None for _ in range(len(videos))])
+    ]
+    log.debug('Running draw poses Scanner job')
+    db.run(output, jobs, force=True)
 
     if path is None:
-        path = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
+        path = [
+            tempfile.NamedTemporaryFile(suffix='.mp4', delete=False).name
+            for _ in range(len(videos))
+        ]
 
-    db.table('tmp').column('frame').save_mp4(os.path.splitext(path)[0])
+    log.debug('Saving output video')
+    for (video, p) in zip(videos, path):
+        db.table(video.scanner_name() + '_tmp').column('frame').save_mp4(os.path.splitext(p)[0])
+        
+    return path
