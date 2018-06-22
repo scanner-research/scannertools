@@ -12,8 +12,6 @@ before_install:
   - pip3 install travis-sphinx
   - docker pull scannerresearch/scanner:cpu
 
-script:
-  - docker run -w /app -v $(pwd):/app scannerresearch/scanner:cpu ./travis.sh
+script: docker run -w /app -v $(pwd):/app scannerresearch/scanner:cpu ./scripts/travis-build.sh
 
-after_success:
-  - travis-sphinx deploy
+after_success: ./scripts/travis-publish.sh

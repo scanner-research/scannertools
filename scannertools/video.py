@@ -9,18 +9,25 @@ class Video:
     Currently only supports mp4.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, scanner_name=None):
         """
         Args:
             path (str): Path to video file
         """
 
         self._path = path
-        try:
-            video_file = storehouse.RandomReadFile(get_storage(), path.encode('ascii'))
-        except UserWarning:
-            raise Exception('Path to video `{}` does not exist.'.format(path))
-        self._decoder = hwang.Decoder(video_file)
+        self._decoder_handle = None
+        self._scanner_name = scanner_name
+
+    # Lazily load decoder
+    def _decoder(self):
+        if self._decoder_handle is None:
+            try:
+                video_file = storehouse.RandomReadFile(get_storage(), self._path.encode('ascii'))
+            except UserWarning:
+                raise Exception('Path to video `{}` does not exist.'.format(self._path))
+            self._decoder_handle = hwang.Decoder(video_file)
+        return self._decoder_handle
 
     def path(self):
         """
@@ -35,42 +42,42 @@ class Video:
             str: Name of the video file in the Scanner database.
         """
 
-        return self.path()
+        return self._scanner_name or self.path()
 
     def width(self):
         """
         Returns:
             int: Width in pixels of the video.
         """
-        return self._decoder.video_index.frame_width()
+        return self._decoder().video_index.frame_width()
 
     def height(self):
         """
         Returns:
             int: Height in pixels of the video.
         """
-        return self._decoder.video_index.frame_height()
+        return self._decoder().video_index.frame_height()
 
     def fps(self):
         """
         Returns:
             float: Frames per seconds of the video.
         """
-        return self._decoder.video_index.fps()
+        return self._decoder().video_index.fps()
 
     def num_frames(self):
         """
         Returns:
             int: Number of frames in the video.
         """
-        return self._decoder.video_index.frames()
+        return self._decoder().video_index.frames()
 
     def duration(self):
         """
         Returns:
             int: Length of the video in seconds.
         """
-        return self._decoder.video_index.duration()
+        return self._decoder().video_index.duration()
 
     def frame(self, number=None, time=None):
         """
@@ -105,7 +112,7 @@ class Video:
         if times is not None:
             numbers = [int(n * self.fps()) for n in times]
 
-        return self._decoder.retrieve(numbers)
+        return self._decoder().retrieve(numbers)
 
     def audio(self):
         """
