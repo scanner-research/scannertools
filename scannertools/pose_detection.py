@@ -61,14 +61,14 @@ def detect_poses(db, videos, frames=None, models_path=None, batch=1):
 
     frame = db.sources.FrameColumn()
     poses_out = db.ops.OpenPose(frame=frame, device=device, args=pose_args, batch=batch)
-    sampled_poses = poses_out.sample()
+    sampled_poses = db.streams.Gather(poses_out)
     output = db.sinks.Column(columns={'poses': sampled_poses})
 
     jobs = [
         Job(
             op_args={
                 frame: db.table(v.scanner_name()).column('frame'),
-                sampled_poses: db.sampler.gather(f) if frames is not None else db.sampler.all(),
+                sampled_poses: f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
                 output: v.scanner_name() + '_pose'
             }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
     ]

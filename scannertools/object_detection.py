@@ -85,7 +85,7 @@ def detect_objects(db, videos, frames=None, nms_threshold=None):
     scanner_ingest(db, videos)
 
     frame = db.sources.FrameColumn()
-    frame_sampled = frame.sample()
+    frame_sampled = db.streams.Gather(frame)
     bboxes = db.ops.ObjDetect(frame=frame_sampled)
     outputs = {'bboxes': bboxes}
 
@@ -98,7 +98,7 @@ def detect_objects(db, videos, frames=None, nms_threshold=None):
         Job(
             op_args={
                 frame: db.table(v.scanner_name()).column('frame'),
-                frame_sampled: db.sampler.gather(f) if f is not None else db.sampler.all(),
+                frame_sampled: f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
                 output: v.scanner_name() + '_objdet'
             }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
     ]

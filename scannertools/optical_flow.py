@@ -27,7 +27,7 @@ def compute_flow(db, videos, frames=None):
     scanner_ingest(db, videos)
 
     frame = db.sources.FrameColumn()
-    frame_sampled = frame.sample()
+    frame_sampled = db.streams.Gather(frame)
     flow = db.ops.OpticalFlow(
         frame=frame_sampled, device=DeviceType.GPU if db.has_gpu() else DeviceType.CPU)
     output = db.sinks.Column(columns={'flow': flow})
@@ -35,7 +35,7 @@ def compute_flow(db, videos, frames=None):
         Job(
             op_args={
                 frame: db.table(video.scanner_name()).column('frame'),
-                frame_sampled: db.sampler.gather(f) if f is not None else db.sampler.all(),
+                frame_sampled: f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
                 output: video.scanner_name() + '_flow'
             }) for video, f in zip(videos, frames or [None for _ in range(len(videos))])
     ]

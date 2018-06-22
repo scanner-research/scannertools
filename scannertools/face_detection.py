@@ -58,8 +58,8 @@ def detect_faces(db, videos, frames=None):
 
     input_frame_columns = [db.table(v.scanner_name()).column('frame') for v in videos]
     output_names = ['{}_face_bboxes'.format(v.scanner_name()) for v in videos]
-    output_samplings = [db.sampler.gather(f) for f in frames] if frames is not None else [
-        db.sampler.all() for _ in range(len(videos))
+    output_samplings = frames if frames is not None else [
+        list(range(db.table(v.scanner_name()))) for v in videos
     ]
 
     outputs = []
@@ -75,7 +75,7 @@ def detect_faces(db, videos, frames=None):
         facenet = db.ops.Facenet(facenet_input=facenet_input, args=facenet_args, device=device)
         facenet_output = db.ops.FacenetOutput(
             facenet_output=facenet, original_frame_info=frame_info, args=facenet_args)
-        sampled_output = facenet_output.sample()
+        sampled_output = db.streams.Gather(facenet_output)
         output = db.sinks.Column(columns={'bboxes': sampled_output})
 
         jobs = []

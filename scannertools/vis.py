@@ -40,7 +40,7 @@ def draw_flow_fields(db, videos, flow_fields, frames=None, path=None):
     scanner_ingest(db, videos)
 
     frame = db.sources.FrameColumn()
-    frame_sampled = frame.sample()
+    frame_sampled = db.streams.Gather(frame)
     flow = db.sources.FrameColumn()
     frame_drawn = db.ops.FlowDraw(frame=frame_sampled, flow=flow)
     output = db.sinks.FrameColumn(columns={'frame': frame_drawn})
@@ -50,7 +50,7 @@ def draw_flow_fields(db, videos, flow_fields, frames=None, path=None):
         Job(
             op_args={
                 frame: db.table(v.scanner_name()).column('frame'),
-                frame_sampled: db.sampler.gather(f) if f is not None else db.sampler.all(),
+                frame_sampled: f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
                 flow: db.table(flow_tab).column('flow'),
                 output: v.scanner_name() + '_tmp_frame'
             })
@@ -126,7 +126,7 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
             force=True)
 
     frame = db.sources.FrameColumn()
-    frame_sampled = frame.sample()
+    frame_sampled = db.streams.Gather(frame)
     bboxes = db.sources.Column()
     frame_drawn = db.ops.BboxDraw(frame=frame_sampled, bboxes=bboxes, label_path=label_path)
     output = db.sinks.Column(columns={'frame': frame_drawn})
@@ -136,7 +136,7 @@ def draw_bboxes(db, videos, bboxes, frames=None, path=None):
         Job(
             op_args={
                 frame: db.table(v.scanner_name()).column('frame'),
-                frame_sampled: db.sampler.gather(f) if f is not None else db.sampler.all(),
+                frame_sampled: f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
                 bboxes: db.table(v.scanner_name() + '_bboxes_draw').column('bboxes'),
                 output: v.scanner_name() + '_tmp'
             }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
@@ -175,7 +175,7 @@ def draw_poses(db, videos, poses, frames=None, path=None):
             force=True)
 
     frame = db.sources.FrameColumn()
-    frame_sampled = frame.sample()
+    frame_sampled = db.streams.Gather(frame)
     poses = db.sources.Column()
     frame_drawn = db.ops.PoseDraw(frame=frame_sampled, poses=poses)
     output = db.sinks.Column(columns={'frame': frame_drawn})
@@ -186,7 +186,7 @@ def draw_poses(db, videos, poses, frames=None, path=None):
                 frame:
                 db.table(video.scanner_name()).column('frame'),
                 frame_sampled:
-                db.sampler.gather(vid_frames) if vid_frames is not None else db.sampler.all(),
+                f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
                 poses:
                 db.table(video.scanner_name() + '_poses_draw').column('poses'),
                 output:
