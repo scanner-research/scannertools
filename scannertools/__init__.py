@@ -1,4 +1,4 @@
-from .prelude import WithMany, init_storage, sample_video, imwrite
+from .prelude import WithMany, init_storage, sample_video, imwrite, BoundOp, Pipeline
 from .video import Video
 from .audio import Audio
 from . import pose_detection

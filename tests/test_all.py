@@ -1,15 +1,17 @@
 import pytest
 import scannertools as st
-import scannertools.object_detection as objdet
-import scannertools.face_detection as facedet
-import scannertools.optical_flow as optflow
-import scannertools.shot_detection as shotdet
-import scannertools.pose_detection as posedet
+import scannertools.object_detection as object_detection
+import scannertools.face_detection as face_detection
+import scannertools.optical_flow as optical_flow
+import scannertools.shot_detection as shot_detection
+import scannertools.pose_detection as pose_detection
+import scannertools.gender_detection as gender_detection
 import scannerpy
 import os
 import subprocess as sp
 import tempfile
 import toml
+import shutil
 
 try:
     sp.check_call(['nvidia-smi'])
@@ -46,6 +48,8 @@ def db():
         with scannerpy.Database(config_path=cfg_f.name) as db:
             yield db
 
+    shutil.rmtree(cfg['storage']['db_path'])
+
 
 def test_frame(video):
     frame = video.frame(0)
@@ -75,13 +79,19 @@ def test_audio(video, audio):
 
 
 def test_object_detection(db, video):
-    bboxes = objdet.detect_objects(db, video, frames=[0], nms_threshold=0.5)
-    assert len([bb for bb in bboxes[0] if bb.score > 0.5]) == 1
+    [bboxes] = object_detection.detect_objects(db, videos=[video], frames=[[0]])
+    assert len([bb for bb in next(bboxes.load()) if bb.score > 0.5]) == 1
 
 
 def test_face_detection(db, video):
-    bboxes = facedet.detect_faces(db, video, frames=[0])
-    assert len([bb for bb in bboxes[0] if bb.score > 0.5]) == 1
+    [bboxes] = face_detection.detect_faces(db, videos=[video], frames=[[0]])
+    assert len([bb for bb in next(bboxes.load()) if bb.score > 0.5]) == 1
+
+
+def test_gender_detection(db, video):
+    bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
+    genders = gender_detection.detect_genders(db, videos=[video], frames=[[0]], bboxes=bboxes)
+    # TODO: test output
 
 
 def test_montage(video):
@@ -89,13 +99,13 @@ def test_montage(video):
 
 
 def test_optical_flow(db, video):
-    optflow.compute_flow(db, video, frames=[1])
+    optical_flow.compute_flow(db, videos=[video], frames=[[1]])
 
 
 def test_shot_detection(db, video):
-    shotdet.detect_shots(db, video)
+    shot_detection.detect_shots(db, videos=[video])
 
 
 @needs_gpu
 def test_pose_detection(db, video):
-    posedet.detect_poses(db, video, frames=[0])
+    pose_detection.detect_poses(db, video, frames=[0])

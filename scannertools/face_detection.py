@@ -1,134 +1,88 @@
 from .prelude import *
-from . import bboxes
-from scannerpy import ScannerException
-from scannerpy.stdlib import NetDescriptor, readers
-from scannerpy.stdlib.util import download_temp_file, temp_directory
-from scannerpy.stdlib.bboxes import proto_to_np
-import os
-import tarfile
-import pickle
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+from scannerpy import Kernel
+from typing import List
+import os.path
 
 
-@autobatch(uniforms=[0])
-def detect_faces(db, videos, frames=None):
-    """
-    detect_faces(db, videos, frames=None)
-    Detects faces in a video.
+@scannerpy.register_python_op()
+class MTCNNDetectFaces(Kernel):
+    def __init__(self, config):
+        import align.detect_face
+        import tensorflow as tf
 
-    Args:
-        db (scannerpy.Database): Handle to Scanner database.
-        videos (Video, autobatched): Videos to process.
-        frames (List[int], autobatched, optional): Frame indices to process.
+        self.sess = tf.Session()
+        g = tf.Graph()
+        g.as_default()
 
-    Returns:
-        List[List[BoundingBox]] (autobatched): List of bounding boxes for each frame.
-    """
+        print('Loading model...')
+        self.config = config
+        self.pnet, self.rnet, self.onet = align.detect_face.create_mtcnn(
+            self.sess, config.args['model_dir'])
+        print('Model loaded!')
 
-    prototxt_path = download_temp_file(
-        'https://storage.googleapis.com/scanner-data/nets/caffe_facenet/facenet_deploy.prototxt')
-    model_weights_path = download_temp_file(
-        'https://storage.googleapis.com/scanner-data/nets/caffe_facenet/facenet_deploy.caffemodel')
-    templates_path = download_temp_file(
-        'https://storage.googleapis.com/scanner-data/nets/caffe_facenet/facenet_templates.bin')
+    def close(self):
+        self.sess.close()
 
-    log.debug('Ingesting video')
-    scanner_ingest(db, videos)
+    def execute(self, frame: FrameType) -> bytes:
+        import align.detect_face
+        threshold = [0.45, 0.6, 0.7]
+        factor = 0.709
+        vmargin = 0.2582651235637604
+        hmargin = 0.3449094129917718
+        out_size = 160
+        detection_window_size_ratio = .2
 
-    descriptor = NetDescriptor(db)
-    descriptor.model_path = prototxt_path
-    descriptor.model_weights_path = model_weights_path
-    descriptor.input_layer_names = ['data']
-    descriptor.output_layer_names = ['score_final']
-    descriptor.mean_colors = [119.29959869, 110.54627228, 101.8384321]
+        imgs = [frame]
+        #print(('Face detect on {} frames'.format(len(imgs))))
+        detections = align.detect_face.bulk_detect_face(
+            imgs, detection_window_size_ratio, self.pnet, self.rnet, self.onet, threshold, factor)
 
-    facenet_args = db.protobufs.FacenetArgs()
-    facenet_args.templates_path = templates_path
-    facenet_args.threshold = 0.5
-    caffe_args = facenet_args.caffe_args
-    caffe_args.net_descriptor.CopyFrom(descriptor.as_proto())
+        batch_faces = []
+        for img, bounding_boxes in zip(imgs, detections):
+            if bounding_boxes == None:
+                batch_faces.append([])
+                continue
+            frame_faces = []
+            bounding_boxes = bounding_boxes[0]
+            num_faces = bounding_boxes.shape[0]
+            for i in range(num_faces):
+                confidence = bounding_boxes[i][4]
+                if confidence < .1:
+                    continue
 
-    if db.has_gpu():
-        device = DeviceType.GPU
-        pipeline_instances = -1
-    else:
-        device = DeviceType.CPU
-        pipeline_instances = 1
+                img_size = np.asarray(img.shape)[0:2]
+                det = np.squeeze(bounding_boxes[i][0:5])
+                vmargin_pix = int((det[2] - det[0]) * vmargin)
+                hmargin_pix = int((det[3] - det[1]) * hmargin)
+                frame_faces.append(
+                    self.config.protobufs.BoundingBox(
+                        x1=np.maximum(det[0] - hmargin_pix / 2, 0) / img_size[1],
+                        y1=np.maximum(det[1] - vmargin_pix / 2, 0) / img_size[0],
+                        x2=np.minimum(det[2] + hmargin_pix / 2, img_size[1]) / img_size[1],
+                        y2=np.minimum(det[3] + vmargin_pix / 2, img_size[0]) / img_size[0],
+                        score=det[4]))
 
-    input_frame_columns = [db.table(v.scanner_name()).column('frame') for v in videos]
-    output_names = ['{}_face_bboxes'.format(v.scanner_name()) for v in videos]
-    output_samplings = frames if frames is not None else [
-        list(range(db.table(v.scanner_name()))) for v in videos
-    ]
+            batch_faces.append(frame_faces)
 
-    outputs = []
-    scales = [1.0, 0.5, 0.25, 0.125]
-    batch_sizes = [int((2**i)) for i in range(len(scales))]
-    for scale, batch in zip(scales, batch_sizes):
-        facenet_args.scale = scale
-        caffe_args.batch_size = batch
+        return writers.bboxes(batch_faces[0], self.config.protobufs)
 
-        frame = db.sources.FrameColumn()
-        frame_info = db.ops.InfoFromFrame(frame=frame)
-        facenet_input = db.ops.FacenetInput(frame=frame, args=facenet_args, device=device)
-        facenet = db.ops.Facenet(facenet_input=facenet_input, args=facenet_args, device=device)
-        facenet_output = db.ops.FacenetOutput(
-            facenet_output=facenet, original_frame_info=frame_info, args=facenet_args)
-        sampled_output = db.streams.Gather(facenet_output)
-        output = db.sinks.Column(columns={'bboxes': sampled_output})
 
-        jobs = []
-        for output_name, frame_column, output_sampling in zip(output_names, input_frame_columns,
-                                                              output_samplings):
-            job = Job(
-                op_args={
-                    frame: frame_column,
-                    sampled_output: output_sampling,
-                    output: '{}_{}'.format(output_name, scale)
-                })
-            jobs.append(job)
+class FaceDetectionPipeline(Pipeline):
+    job_suffix = 'face'
+    parser_fn = lambda _: readers.bboxes
+    run_opts = {'pipeline_instances_per_node': 2}
 
-        log.debug('Running face detection (scale {}) Scanner job'.format(scale))
-        output = db.run(
-            output,
-            jobs,
-            force=True,
-            work_packet_size=batch * 4,
-            io_packet_size=batch * 20,
-            pipeline_instances_per_node=pipeline_instances)
+    def fetch_resources(self):
+        try_import('align.detect_face', __name__)
+        try_import('tensorflow', __name__)
 
-        output = [db.table('{}_{}'.format(output_name, scale)) for output_name in output_names]
-        outputs.append(output)
+    def build_pipeline(self):
+        import align
+        return {
+            'bboxes':
+            self._db.ops.MTCNNDetectFaces(
+                frame=self._sources['frame_sampled'].op, model_dir=os.path.dirname(align.__file__))
+        }
 
-    bbox_inputs = [db.sources.Column() for _ in outputs]
-    nmsed_bboxes = db.ops.BboxNMS(*bbox_inputs, threshold=0.1)
-    output = db.sinks.Column(columns={'nmsed_bboxes': nmsed_bboxes})
 
-    jobs = []
-    for i in range(len(input_frame_columns)):
-        op_args = {}
-        for bi, cols in enumerate(outputs):
-            op_args[bbox_inputs[bi]] = cols[i].column('bboxes')
-        op_args[output] = output_names[i]
-        jobs.append(Job(op_args=op_args))
-
-    log.debug('Running bbox nms Scanner job')
-    output_tables = db.run(output, jobs, force=True)
-
-    output_tables = [db.table(n) for n in output_names]
-    all_bboxes = [
-        list(output_table.column('nmsed_bboxes').load(readers.bboxes))
-        for output_table in output_tables
-    ]
-
-    for vid, vid_bb in zip(videos, all_bboxes):
-        for frame_bb in vid_bb:
-            for bb in frame_bb:
-                bb.label = 1
-                bb.x1 /= vid.width()
-                bb.x2 /= vid.width()
-                bb.y1 /= vid.height()
-                bb.y2 /= vid.height()
-
-    return all_bboxes
+detect_faces = make_pipeline_runner(FaceDetectionPipeline)

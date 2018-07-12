@@ -1,7 +1,8 @@
 from .prelude import *
 from . import bboxes
 from scannerpy.stdlib.util import download_temp_file, temp_directory
-from scannerpy.stdlib import tensorflow, writers
+from scannerpy.stdlib import writers
+from scannerpy.stdlib.tensorflow import TensorFlowKernel
 from scannerpy import FrameType
 import os
 import tarfile
@@ -22,7 +23,7 @@ GRAPH_PATH = os.path.join(
 
 
 @scannerpy.register_python_op()
-class ObjDetect(tensorflow.TensorFlowKernel):
+class DetectObjects(TensorFlowKernel):
     def build_graph(self):
         dnn = tf.Graph()
         with dnn.as_default():
@@ -54,63 +55,36 @@ class ObjDetect(tensorflow.TensorFlowKernel):
             return writers.bboxes(bboxes, self.protobufs)
 
 
-@autobatch(uniforms=[0, 'nms_threshold'])
-def detect_objects(db, videos, frames=None, nms_threshold=None):
+class ObjectDetectionPipeline(Pipeline):
     """
-    detect_objects(db, videos, frames=None, nms_threshold=None)
     Detects objects in a video.
 
     Uses the SSD-Mobilenet architecture from the TensorFlow `Object Detection API <https://github.com/tensorflow/models/tree/abd504235f3c2eed891571d62f0a424e54a2dabc/research/object_detection>`_.
-
-    Args:
-        db (scannerpy.Database): Handle to Scanner database.
-        videos (Video, autobatched): Videos to process.
-        frames (List[int], autobatched, optional): Frame indices to process.
-        nms_threshold (float, optional): Fraction of IoU to merge bounding boxes during NMS.
-
-    Returns:
-        List[List[BoundingBox]] (autobatched): List of bounding boxes for each frame.
     """
 
-    try_import('tensorflow', __name__)
+    job_suffix = 'objdet'
+    parser_fn = lambda _: readers.bboxes
+    run_opts = {'pipeline_instances_per_node': 2}
 
-    if not os.path.isdir(os.path.join(temp_directory(), MODEL_NAME)):
-        log.debug('Downloading model')
-        model_tar_path = download_temp_file(DOWNLOAD_BASE + MODEL_FILE)
-        with tarfile.open(model_tar_path) as f:
-            f.extractall(temp_directory())
-        download_temp_file(LABEL_URL)
+    def fetch_resources(self):
+        try_import('tensorflow', __name__)
 
-    log.debug('Ingesting video')
-    scanner_ingest(db, videos)
+        if not os.path.isdir(os.path.join(temp_directory(), MODEL_NAME)):
+            log.debug('Downloading model')
+            model_tar_path = download_temp_file(DOWNLOAD_BASE + MODEL_FILE)
+            with tarfile.open(model_tar_path) as f:
+                f.extractall(temp_directory())
+            download_temp_file(LABEL_URL)
 
-    frame = db.sources.FrameColumn()
-    frame_sampled = db.streams.Gather(frame)
-    bboxes = db.ops.ObjDetect(frame=frame_sampled)
-    outputs = {'bboxes': bboxes}
+    def build_pipeline(self):
+        bboxes = self._db.ops.DetectObjects(frame=self._sources[
+            'frame_sampled'].op if 'frame_sampled' in self._sources else self._sources['frame'].op)
+        outputs = {'bboxes': bboxes}
 
-    if nms_threshold is not None:
-        outputs['nmsed_bboxes'] = db.ops.BboxNMS(bboxes, threshold=nms_threshold)
+        # if nms_threshold is not None:
+        #     outputs['nmsed_bboxes'] = self._db.ops.BboxNMS(bboxes, threshold=nms_threshold)
 
-    output = db.sinks.Column(columns=outputs)
+        return outputs
 
-    jobs = [
-        Job(
-            op_args={
-                frame: db.table(v.scanner_name()).column('frame'),
-                frame_sampled: f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
-                output: v.scanner_name() + '_objdet'
-            }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
-    ]
 
-    log.debug('Running object detection Scanner job')
-    output_tables = db.run(output, jobs, force=True)
-
-    log.debug('Loading bounding boxes')
-    all_bboxes = [
-        list(
-            output_table.column('nmsed_bboxes' if nms_threshold is not None else 'bboxes').load(
-                readers.bboxes)) for output_table in output_tables
-    ]
-
-    return all_bboxes
+detect_objects = make_pipeline_runner(ObjectDetectionPipeline)
