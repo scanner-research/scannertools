@@ -4,6 +4,7 @@ import scannerpy
 from scannerpy.stdlib.util import download_temp_file
 from scannerpy.stdlib import readers
 import os
+import numpy as np
 
 MODEL_FILE = 'https://storage.googleapis.com/esper/models/facenet/20170512-110547.tar.gz'
 
@@ -36,7 +37,7 @@ class EmbedFaces(Kernel):
 
         out_size = 160
         bboxes = readers.bboxes(bboxes, self.config.protobufs)
-        outputs = b' '
+        outputs = b''
         for bbox in bboxes:
             # NOTE: if using output of mtcnn, not-normalized, so removing de-normalization factors here
             face_img = frame[int(bbox.y1*h):int(bbox.y2*h), int(bbox.x1*w):int(bbox.x2*w)]
@@ -55,12 +56,12 @@ class EmbedFaces(Kernel):
 
                 outputs += embs[0].tobytes()
 
-        return outputs
+        return ' ' if outputs == b'' else outputs
 
 
 class FaceEmbeddingPipeline(Pipeline):
     job_suffix = 'embed'
-    parser_fn = lambda _: lambda x: x
+    parser_fn = lambda _: readers.array(np.float32)
     run_opts = {'pipeline_instances_per_node': 1}
     required_sources = ['videos', 'bboxes']
 

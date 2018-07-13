@@ -92,12 +92,14 @@ def test_face_detection(db, video):
 def test_gender_detection(db, video):
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
     genders = gender_detection.detect_genders(db, videos=[video], frames=[[0]], bboxes=bboxes)
+    next(genders[0].load())
     # TODO: test output
 
 
 def test_face_embedding(db, video):
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
     embeddings = face_embedding.embed_faces(db, videos=[video], frames=[[0]], bboxes=bboxes)
+    next(embeddings[0].load())
     # TODO: test output
 
 

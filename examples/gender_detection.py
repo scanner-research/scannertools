@@ -9,5 +9,5 @@ with st.sample_video() as video:
     frames = list(range(50))
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[frames])
     genders = gender_detection.detect_genders(db, videos=[video], frames=[frames], bboxes=bboxes)
-    # TODO: draw genders
+    print('First gender: {}'.format(next(genders[0].load())))
     print('Finished computing genders')

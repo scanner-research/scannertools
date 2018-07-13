@@ -26,7 +26,7 @@ class DetectGender(scannerpy.Kernel):
 
 class GenderDetectionPipeline(Pipeline):
     job_suffix = 'gender'
-    parser_fn = lambda _: pickle.loads
+    parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
     required_sources = ['videos', 'bboxes']
     run_opts = {'pipeline_instances_per_node': 1}
 
