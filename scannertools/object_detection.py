@@ -7,7 +7,6 @@ from scannerpy import FrameType
 import os
 import tarfile
 import numpy as np
-import tensorflow as tf
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -25,6 +24,7 @@ GRAPH_PATH = os.path.join(
 @scannerpy.register_python_op()
 class DetectObjects(TensorFlowKernel):
     def build_graph(self):
+        import tensorflow as tf
         dnn = tf.Graph()
         with dnn.as_default():
             od_graph_def = tf.GraphDef()

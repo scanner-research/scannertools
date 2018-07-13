@@ -102,4 +102,4 @@ class DrawPosesPipeline(VideoOutputPipeline):
         }
 
 
-draw_flow = make_pipeline_runner(DrawFlowPipeline, optional_exec_args=['paths'])
+draw_poses = make_pipeline_runner(DrawPosesPipeline, optional_exec_args=['paths'])

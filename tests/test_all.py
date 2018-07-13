@@ -6,6 +6,7 @@ import scannertools.optical_flow as optical_flow
 import scannertools.shot_detection as shot_detection
 import scannertools.pose_detection as pose_detection
 import scannertools.gender_detection as gender_detection
+import scannertools.face_embedding as face_embedding
 import scannerpy
 import os
 import subprocess as sp
@@ -91,6 +92,12 @@ def test_face_detection(db, video):
 def test_gender_detection(db, video):
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
     genders = gender_detection.detect_genders(db, videos=[video], frames=[[0]], bboxes=bboxes)
+    # TODO: test output
+
+
+def test_face_embedding(db, video):
+    bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
+    embeddings = face_embedding.embed_faces(db, videos=[video], frames=[[0]], bboxes=bboxes)
     # TODO: test output
 
 

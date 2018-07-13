@@ -1,5 +1,5 @@
 import scannertools as st
-import scannertools.object_detection as objdet
+import scannertools.object_detection as object_detection
 import scannertools.vis as vis
 import scannerpy
 import os
@@ -9,7 +9,7 @@ with st.sample_video(delete=False) as video:
     frames = list(range(0, 20, 3))
 
     print('Running object detector')
-    [bboxes] = objdet.detect_objects(db, videos=[video], frames=[frames])
+    [bboxes] = object_detection.detect_objects(db, videos=[video], frames=[frames])
 
     print('Running bbox visualizer')
     vis.draw_bboxes(
