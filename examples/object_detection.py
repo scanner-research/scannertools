@@ -1,10 +1,8 @@
-import scannertools as st
-import scannertools.object_detection as object_detection
-import scannertools.vis as vis
+from scannertools import sample_video, object_detection, vis
 import scannerpy
 import os
 
-with st.sample_video(delete=False) as video:
+with sample_video(delete=False) as video:
     db = scannerpy.Database()
     frames = list(range(0, 20, 3))
 

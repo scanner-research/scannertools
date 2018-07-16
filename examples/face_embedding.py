@@ -1,10 +1,8 @@
-import scannertools as st
-import scannertools.face_detection as face_detection
-import scannertools.face_embedding as face_embedding
+from scannertools import face_detection, face_embedding, sample_video
 import scannerpy
 import os
 
-with st.sample_video() as video:
+with sample_video() as video:
     db = scannerpy.Database()
     frames = list(range(10))
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[frames], no_execute=True)

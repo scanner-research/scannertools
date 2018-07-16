@@ -10,3 +10,4 @@ from . import optical_flow
 from . import tf_vis_utils
 from . import vis
 from . import bboxes
+from . import kube
