@@ -4,6 +4,8 @@ Scannertools is a high-level Python library for scalable video analysis built on
 
 * [Object detection](https://github.com/scanner-research/scannertools/blob/master/examples/object_detection.py)
 * [Face detection](https://github.com/scanner-research/scannertools/blob/master/examples/face_detection.py)
+* [Face embedding](https://github.com/scanner-research/scannertools/blob/master/examples/face_embedding.py)
+* [Gender detection](https://github.com/scanner-research/scannertools/blob/master/examples/gender_detection.py)
 * [Pose detection](https://github.com/scanner-research/scannertools/blob/master/examples/pose_detection.py)
 * [Optical flow](https://github.com/scanner-research/scannertools/blob/master/examples/optical_flow.py)
 * [Shot detection](https://github.com/scanner-research/scannertools/blob/master/examples/shot_detection.py)
@@ -16,22 +18,21 @@ See the [documentation](https://scanner-research.github.io/scannertools/) for de
 Here's an example using scannertools to extract faces in every 10th frame of a video, and then to draw the bounding boxes on one of those frames.
 
 ```python
-import scannertools as st
-import scannertools.face_detection as facedet
+from scannertools import face_detection, Video, imwrite
 import scannerpy
 import cv2
 
 # Get a reference to the video
-video = st.Video('path/to/your/video.mp4')
+video = Video('path/to/your/video.mp4')
 frame_nums = list(range(0, video.num_frames(), 10))
 
 # Run the face detection algorithm
-with scannerpy.Database() as db:
-    face_bboxes = facedet.detect_faces(db, video, frame_nums)
+db = scannerpy.Database()
+face_bboxes = face_detection.detect_faces(db, videos=[video], frames=[frame_nums])
 
 # Draw the bounding boxes
 frame = video.frame(frame_nums[3])
-for bbox in face_bboxes[3]:
+for bbox in list(face_bboxes.load())[3]:
     cv2.rectangle(
         frame,
         (int(bbox.x1 * video.width()), int(bbox.y1 * video.height())),
@@ -40,7 +41,7 @@ for bbox in face_bboxes[3]:
         4)
 
 # Save the image to disk
-st.imwrite('example.jpg', frame)
+imwrite('example.jpg', frame)
 ```
 
 For more examples, see the [examples](https://github.com/scanner-research/scannertools/tree/master/examples) directory. For the API reference, see our [documentation](https://scanner-research.github.io/scannertools/).
