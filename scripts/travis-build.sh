@@ -9,7 +9,7 @@ export PYTHONPATH=/tmp/facenet/src:/tmp/rude-carnie:$PYTHONPATH
 popd
 
 # Run unit tests
-python setup.py test
+python3 setup.py test
 
 # Build docs
 pip3 install travis-sphinx sphinx-nameko-theme
