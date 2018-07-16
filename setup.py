@@ -9,5 +9,5 @@ setup(
     author_email='wcrichto@cs.stanford.edu',
     license='Apache 2.0',
     packages=['scannertools'],
-    install_requires=['requests', 'numpy', 'scipy', 'requests'],
+    install_requires=['requests', 'numpy', 'scipy', 'requests', 'attrs'],
     zip_safe=False)
