@@ -10,4 +10,6 @@ setup(
     license='Apache 2.0',
     packages=['scannertools'],
     install_requires=['requests', 'numpy', 'scipy', 'requests', 'attrs'],
+    setup_requires=['pytest-runner'],
+    tests_require=['pytest', 'tensorflow==1.5.0'],
     zip_safe=False)
