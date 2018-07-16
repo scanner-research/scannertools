@@ -9,6 +9,7 @@ export PYTHONPATH=/tmp/facenet/src:/tmp/rude-carnie:$PYTHONPATH
 popd
 
 # Run unit tests
+pip3 install --upgrade setuptools
 python3 setup.py test
 
 # Build docs
