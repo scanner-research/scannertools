@@ -3,16 +3,12 @@ from scannerpy.stdlib.util import temp_directory, download_temp_file
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-
-@autobatch(uniforms=[0, 'cache', 'models_path', 'batch'])
-def detect_poses(db, videos, frames=None, models_path=None, batch=1):
-    """
-    detect_poses(db, videos, frames=None, models_path=None, batch=1)
-    WIP, don't use
-    """
-
-    if models_path is None:
-        models_path = os.path.join(temp_directory(), 'openpose')
+class PoseDetectionPipeline(Pipeline):
+    job_suffix = 'pose'
+    parser_fn = lambda _: readers.poses
+    
+    def fetch_resources(self):
+        self._models_path = os.path.join(temp_directory(), 'openpose')
         pose_fs_url = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/'
         # Pose prototxt
         download_temp_file('https://raw.githubusercontent.com/CMU-Perceptual-Computing-Lab/'
@@ -43,41 +39,21 @@ def detect_poses(db, videos, frames=None, models_path=None, batch=1):
                            'openpose/master/models/face/haarcascade_frontalface_alt.xml',
                            'openpose/face/haarcascade_frontalface_alt.xml')
 
-    log.debug('Ingesting videos')
-    scanner_ingest(db, videos)
+    def build_pipeline(self):
+        if not self._db.has_gpu():
+            raise Exception("Pose detection requires GPU to run")
 
-    pose_args = db.protobufs.OpenPoseArgs()
-    pose_args.model_directory = models_path
-    pose_args.pose_num_scales = 3
-    pose_args.pose_scale_gap = 0.33
-    pose_args.hand_num_scales = 4
-    pose_args.hand_scale_gap = 0.4
+        pose_args = self._db.protobufs.OpenPoseArgs()
+        pose_args.model_directory = self._models_path
+        pose_args.pose_num_scales = 3
+        pose_args.pose_scale_gap = 0.33
+        pose_args.hand_num_scales = 4
+        pose_args.hand_scale_gap = 0.4
 
-    if db.has_gpu():
-        device = DeviceType.GPU
-        pipeline_instances = -1
-    else:
-        raise Exception("Pose detection pipeline currently requires a GPU to run.")
+        return {'poses': self._db.ops.OpenPose(
+            frame=self._sources['frame_sampled'].op, 
+            device=DeviceType.GPU, 
+            args=pose_args, 
+            batch=5)}
 
-    frame = db.sources.FrameColumn()
-    poses_out = db.ops.OpenPose(frame=frame, device=device, args=pose_args, batch=batch)
-    sampled_poses = db.streams.Gather(poses_out)
-    output = db.sinks.Column(columns={'poses': sampled_poses})
-
-    jobs = [
-        Job(
-            op_args={
-                frame: db.table(v.scanner_name()).column('frame'),
-                sampled_poses: f if f is not None else list(range(db.table(v.scanner_name()).num_rows())),
-                output: v.scanner_name() + '_pose'
-            }) for v, f in zip(videos, frames or [None for _ in range(len(videos))])
-    ]
-
-    output_tables = db.run(
-        output,
-        jobs,
-        force=True,
-        work_packet_size=8,
-        pipeline_instances_per_node=pipeline_instances)
-
-    return [list(t.column('poses').load(readers.poses)) for t in output_tables]
+detect_poses = make_pipeline_runner(PoseDetectionPipeline)

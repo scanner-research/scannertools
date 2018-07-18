@@ -1,30 +1,30 @@
 from .prelude import *
-from scannerpy import Kernel
+from scannerpy.stdlib.tensorflow import TensorFlowKernel
 from typing import List
 import os.path
 
 
-@scannerpy.register_python_op()
-class MTCNNDetectFaces(Kernel):
-    def __init__(self, config):
-        import align.detect_face
+@scannerpy.register_python_op(name='MTCNNDetectFacesCPU', device_type=DeviceType.CPU)
+@scannerpy.register_python_op(name='MTCNNDetectFacesGPU', device_type=DeviceType.GPU)
+class MTCNNDetectFaces(TensorFlowKernel):
+    def build_graph(self):
         import tensorflow as tf
-
-        self.sess = tf.Session()
-        g = tf.Graph()
-        g.as_default()
-
-        print('Loading model...')
-        self.config = config
-        self.pnet, self.rnet, self.onet = align.detect_face.create_mtcnn(
-            self.sess, config.args['model_dir'])
-        print('Model loaded!')
-
-    def close(self):
-        self.sess.close()
+        self.pnet = None
+        self.g = tf.Graph()
+        self._g_default = self.g.as_default()
+        return self.g
 
     def execute(self, frame: FrameType) -> bytes:
         import align.detect_face
+
+        if self.pnet is None:
+            with self.g.as_default():
+                with self.sess.as_default():
+                    print('Loading model...')
+                    self.pnet, self.rnet, self.onet = align.detect_face.create_mtcnn(
+                        self.sess, self.config.args['model_dir'])
+                    print('Model loaded!')
+
         threshold = [0.45, 0.6, 0.7]
         factor = 0.709
         vmargin = 0.2582651235637604
@@ -70,7 +70,7 @@ class MTCNNDetectFaces(Kernel):
 class FaceDetectionPipeline(Pipeline):
     job_suffix = 'face'
     parser_fn = lambda _: readers.bboxes
-    run_opts = {'pipeline_instances_per_node': 2}
+    run_opts = {'pipeline_instances_per_node': 1}
 
     def fetch_resources(self):
         try_import('align.detect_face', __name__)
@@ -80,8 +80,9 @@ class FaceDetectionPipeline(Pipeline):
         import align
         return {
             'bboxes':
-            self._db.ops.MTCNNDetectFaces(
-                frame=self._sources['frame_sampled'].op, model_dir=os.path.dirname(align.__file__))
+            getattr(self._db.ops, 'MTCNNDetectFaces{}'.format('GPU' if self._db.has_gpu() else 'CPU'))(
+                frame=self._sources['frame_sampled'].op, model_dir=os.path.dirname(align.__file__),
+                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
         }
 
 
