@@ -25,4 +25,4 @@ class OpticalFlowPipeline(Pipeline):
         }
 
 
-compute_flow = make_pipeline_runner(OpticalFlowPipeline)
+compute_flow = OpticalFlowPipeline.make_runner()

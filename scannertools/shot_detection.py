@@ -7,12 +7,12 @@ WINDOW_SIZE = 500
 class ShotDetectionPipeline(Pipeline):
     job_suffix = 'hist'
     parser_fn = lambda _: readers.histograms
-        
+
     def build_pipeline(self):
         return {'histogram': self._db.ops.Histogram(
-            frame=self._sources['frame'].op, 
+            frame=self._sources['frame'].op,
             device=DeviceType.GPU if self._db.has_gpu() and False else DeviceType.CPU)}
-        
+
     def _compute_shot_boundaries(self, hists):
         # Compute the mean difference between each pair of adjacent frames
         diffs = np.array([
@@ -35,4 +35,4 @@ class ShotDetectionPipeline(Pipeline):
         return [self._compute_shot_boundaries(list(vid_hists.load())) for vid_hists in all_hists]
 
 
-detect_shots = make_pipeline_runner(ShotDetectionPipeline)
+detect_shots = ShotDetectionPipeline.make_runner()

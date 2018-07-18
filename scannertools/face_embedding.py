@@ -1,4 +1,4 @@
-from .prelude import Pipeline, make_pipeline_runner, try_import
+from .prelude import Pipeline, try_import
 from scannerpy import FrameType, DeviceType
 import scannerpy
 from scannerpy.stdlib.util import download_temp_file
@@ -87,4 +87,4 @@ class FaceEmbeddingPipeline(Pipeline):
         }
 
 
-embed_faces = make_pipeline_runner(FaceEmbeddingPipeline)
+embed_faces = FaceEmbeddingPipeline.make_runner()

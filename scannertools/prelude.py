@@ -332,6 +332,44 @@ class Pipeline(ABC):
 
         return self.parse_output(**output_args)
 
+    @classmethod
+    def make_runner(cls):
+        def runner(db, run_opts={}, no_execute=False, **kwargs):
+            pipeline = cls(db)
+
+            def method_arg_names(f):
+                return list(inspect.signature(f).parameters.keys())
+
+            source_arg_names = ['videos', 'frames'] + pipeline.additional_sources
+            sink_arg_names = method_arg_names(pipeline.build_sink)
+            output_arg_names = method_arg_names(pipeline.parse_output)
+
+            source_args = {}
+            sink_args = {}
+            output_args = {}
+
+            for k, v in kwargs.items():
+                found = False
+                for (names, dct) in [(source_arg_names, source_args), \
+                                     (sink_arg_names, sink_args), \
+                                     (output_arg_names, output_args)]:
+                    if k in names:
+                        dct[k] = v
+                        found = True
+                        break
+
+                if not found:
+                    raise Exception('Received unexpected arguments "{}"'.format(k))
+
+            return pipeline.execute(
+                source_args=source_args,
+                sink_args=sink_args,
+                output_args=output_args,
+                run_opts=run_opts,
+                no_execute=no_execute)
+
+        return runner
+
 
 class VideoOutputPipeline(Pipeline):
     def parse_output(self, paths=None):
@@ -344,41 +382,3 @@ class VideoOutputPipeline(Pipeline):
             self._db.table(table).column('frame').save_mp4(os.path.splitext(p)[0])
 
         return paths
-
-
-def make_pipeline_runner(Pipeline):
-    def runner(db, run_opts={}, no_execute=False, **kwargs):
-        pipeline = Pipeline(db)
-
-        def method_arg_names(f):
-            return list(inspect.signature(f).parameters.keys())
-
-        source_arg_names = ['videos', 'frames'] + pipeline.additional_sources
-        sink_arg_names = method_arg_names(pipeline.build_sink)
-        output_arg_names = method_arg_names(pipeline.parse_output)
-
-        source_args = {}
-        sink_args = {}
-        output_args = {}
-
-        for k, v in kwargs.items():
-            found = False
-            for (names, dct) in [(source_arg_names, source_args), \
-                                 (sink_arg_names, sink_args), \
-                                 (output_arg_names, output_args)]:
-                if k in names:
-                    dct[k] = v
-                    found = True
-                    break
-
-            if not found:
-                raise Exception('Received unexpected arguments "{}"'.format(k))
-
-        return pipeline.execute(
-            source_args=source_args,
-            sink_args=sink_args,
-            output_args=output_args,
-            run_opts=run_opts,
-            no_execute=no_execute)
-
-    return runner

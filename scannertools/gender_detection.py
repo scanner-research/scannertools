@@ -1,4 +1,4 @@
-from .prelude import Pipeline, try_import, make_pipeline_runner
+from .prelude import Pipeline, try_import
 from scannerpy.stdlib import readers
 from scannerpy.stdlib.util import download_temp_file
 from scannerpy import FrameType
@@ -41,4 +41,4 @@ class GenderDetectionPipeline(Pipeline):
             model_dir=self._model_dir)}
 
 
-detect_genders = make_pipeline_runner(GenderDetectionPipeline)
+detect_genders = GenderDetectionPipeline.make_runner()

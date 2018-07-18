@@ -6,7 +6,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 class PoseDetectionPipeline(Pipeline):
     job_suffix = 'pose'
     parser_fn = lambda _: readers.poses
-    
+
     def fetch_resources(self):
         self._models_path = os.path.join(temp_directory(), 'openpose')
         pose_fs_url = 'http://posefs1.perception.cs.cmu.edu/OpenPose/models/'
@@ -51,9 +51,9 @@ class PoseDetectionPipeline(Pipeline):
         pose_args.hand_scale_gap = 0.4
 
         return {'poses': self._db.ops.OpenPose(
-            frame=self._sources['frame_sampled'].op, 
-            device=DeviceType.GPU, 
-            args=pose_args, 
+            frame=self._sources['frame_sampled'].op,
+            device=DeviceType.GPU,
+            args=pose_args,
             batch=5)}
 
-detect_poses = make_pipeline_runner(PoseDetectionPipeline)
+detect_poses = PoseDetectionPipeline.make_runner()

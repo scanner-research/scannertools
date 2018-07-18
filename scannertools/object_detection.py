@@ -87,4 +87,4 @@ class ObjectDetectionPipeline(Pipeline):
         return outputs
 
 
-detect_objects = make_pipeline_runner(ObjectDetectionPipeline)
+detect_objects = ObjectDetectionPipeline.make_runner()

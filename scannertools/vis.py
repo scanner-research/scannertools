@@ -31,7 +31,7 @@ class DrawFlowsPipeline(VideoOutputPipeline):
         }
 
 
-draw_flows = make_pipeline_runner(DrawFlowsPipeline)
+draw_flows = DrawFlowsPipeline.make_runner()
 
 
 @scannerpy.register_python_op()
@@ -80,7 +80,7 @@ class DrawBboxesPipeline(VideoOutputPipeline):
         }
 
 
-draw_bboxes = make_pipeline_runner(DrawBboxesPipeline)
+draw_bboxes = DrawBboxesPipeline.make_runner()
 
 
 @scannerpy.register_python_op(name='PoseDraw')
@@ -102,4 +102,4 @@ class DrawPosesPipeline(VideoOutputPipeline):
         }
 
 
-draw_poses = make_pipeline_runner(DrawPosesPipeline)
+draw_poses = DrawPosesPipeline.make_runner()

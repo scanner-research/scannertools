@@ -86,4 +86,4 @@ class FaceDetectionPipeline(Pipeline):
         }
 
 
-detect_faces = make_pipeline_runner(FaceDetectionPipeline)
+detect_faces = FaceDetectionPipeline.make_runner()
