@@ -67,7 +67,7 @@ class EmbedFaces(TensorFlowKernel):
 
 class FaceEmbeddingPipeline(Pipeline):
     job_suffix = 'embed'
-    parser_fn = lambda _: readers.array(np.float32)
+    parser_fn = lambda _: readers.array(np.float32, size=128)
     run_opts = {'pipeline_instances_per_node': 1}
     required_sources = ['videos', 'bboxes']
 

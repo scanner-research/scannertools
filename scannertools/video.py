@@ -112,7 +112,12 @@ class Video:
         if times is not None:
             numbers = [int(n * self.fps()) for n in times]
 
-        return self._decoder().retrieve(numbers)
+        # Hwang expects: a) no duplicates, and b) sorted frame indices
+        to_fetch = sorted(list(set(numbers)))
+        frames = self._decoder().retrieve(to_fetch)
+        idx_map = {n: i for i, n in enumerate(to_fetch)}
+        
+        return [frames[idx_map[n]].copy() for n in numbers]
 
     def audio(self):
         """
