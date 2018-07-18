@@ -69,8 +69,8 @@ def test_frame_time(video):
 
 
 def test_frames(video):
-    frames = video.frames([0, 1])
-    assert len(frames) == 2
+    frames = video.frames([1, 1, 0])
+    assert len(frames) == 3
 
 
 def test_audio(video, audio):

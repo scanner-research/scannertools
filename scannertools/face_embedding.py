@@ -18,7 +18,7 @@ class EmbedFaces(TensorFlowKernel):
         self.images_placeholder = None
         self.g = tf.Graph()
         self._g_default = self.g.as_default()
-        return self.g 
+        return self.g
 
     def execute(self, frame: FrameType, bboxes: bytes) -> bytes:
         import facenet
@@ -69,7 +69,7 @@ class FaceEmbeddingPipeline(Pipeline):
     job_suffix = 'embed'
     parser_fn = lambda _: readers.array(np.float32, size=128)
     run_opts = {'pipeline_instances_per_node': 1}
-    required_sources = ['videos', 'bboxes']
+    additional_sources = ['bboxes']
 
     def fetch_resources(self):
         try_import('facenet', __name__)

@@ -10,7 +10,6 @@ with sample_video(delete=False) as video:
     [bboxes] = object_detection.detect_objects(db, videos=[video], frames=[frames])
 
     print('Running bbox visualizer')
-    vis.draw_bboxes(
-        db, videos=[video], frames=[frames], bboxes=[bboxes], paths=['sample_objects.mp4'])
+    vis.draw_bboxes(db, videos=[video], frames=[frames], bboxes=[bboxes], paths=['sample_objects.mp4'])
 
     print('Wrote video with objects drawn to {}'.format(os.path.abspath('sample_objects.mp4')))

@@ -64,7 +64,7 @@ class ObjectDetectionPipeline(Pipeline):
 
     job_suffix = 'objdet'
     parser_fn = lambda _: readers.bboxes
-    run_opts = {'pipeline_instances_per_node': 2}
+    run_opts = {'pipeline_instances_per_node': 1}
 
     def fetch_resources(self):
         try_import('tensorflow', __name__)

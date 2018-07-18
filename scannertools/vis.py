@@ -21,7 +21,7 @@ def flow_draw(config, frame: FrameType, flow: FrameType) -> FrameType:
 
 class DrawFlowsPipeline(VideoOutputPipeline):
     job_suffix = 'draw_flow'
-    required_sources = ['videos', 'flows']
+    additional_sources = ['flows']
 
     def build_pipeline(self):
         return {
@@ -31,7 +31,7 @@ class DrawFlowsPipeline(VideoOutputPipeline):
         }
 
 
-draw_flows = make_pipeline_runner(DrawFlowsPipeline, optional_exec_args=['paths'])
+draw_flows = make_pipeline_runner(DrawFlowsPipeline)
 
 
 @scannerpy.register_python_op()
@@ -63,7 +63,7 @@ class BboxDraw(scannerpy.Kernel):
 
 class DrawBboxesPipeline(VideoOutputPipeline):
     job_suffix = 'draw_bboxes'
-    required_sources = ['videos', 'bboxes']
+    additional_sources = ['bboxes']
 
     def fetch_resources(self):
         self._label_path = download_temp_file(
@@ -80,7 +80,7 @@ class DrawBboxesPipeline(VideoOutputPipeline):
         }
 
 
-draw_bboxes = make_pipeline_runner(DrawBboxesPipeline, optional_exec_args=['paths'])
+draw_bboxes = make_pipeline_runner(DrawBboxesPipeline)
 
 
 @scannerpy.register_python_op(name='PoseDraw')
@@ -92,7 +92,7 @@ def pose_draw(config, frame: FrameType, poses: bytes) -> FrameType:
 
 class DrawPosesPipeline(VideoOutputPipeline):
     job_suffix = 'draw_pose'
-    required_sources = ['videos', 'poses']
+    additional_sources = ['poses']
 
     def build_pipeline(self):
         return {
@@ -102,4 +102,4 @@ class DrawPosesPipeline(VideoOutputPipeline):
         }
 
 
-draw_poses = make_pipeline_runner(DrawPosesPipeline, optional_exec_args=['paths'])
+draw_poses = make_pipeline_runner(DrawPosesPipeline)
