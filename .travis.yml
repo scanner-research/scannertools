@@ -13,8 +13,8 @@ before_install:
   - export LC_ALL=C.UTF-8
   - export LANG=C.UTF-8
   - pip3 install travis-sphinx
-  - docker pull scannerresearch/scanner:cpu
+  - docker pull scannerresearch/scanner:cpu-latest
 
-script: docker run -w /app -v $(pwd):/app scannerresearch/scanner:cpu ./scripts/travis-build.sh
+script: docker run -w /app -v $(pwd):/app scannerresearch/scanner:cpu-latest ./scripts/travis-build.sh
 
 after_success: ./scripts/travis-publish.sh
