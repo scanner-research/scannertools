@@ -1,20 +1,18 @@
 language: python
 python:
-  - "3.5"
-
+- '3.5'
 sudo: required
 services:
-  - docker
-
+- docker
 env:
-  secure: "M+N4gEsYsiF+zfFBSG7bvpmKNOff+c0uX1dUZ9/rFoBro7Lftsq3FvGuLMvfb9gzuNcWH9vSKf9fmUI6apeBxgVqFIzn/LiNhbdrVzg8P2IRtZ2GSDOmzyp0HDzL/bET8FncQLccKCG3Il3QmGstBTJ3cpxJqJ1O60CsnKGX+UlYr51yz53hPBETbgLsEFTNFXVifvgrKJumfBqjx2QdqkYTUQO6JjYbcUo3rlgqA6eSluCY/DgSB0xzaznB8XbdJkIi7B98E/zmxM6uJKAYXNR/Srv+jbcryjW9GXldYHbQad06O1bKK12UPnrCKIVVg9iHd/Mx7S9eqeueGOMAfozIAcGG+oOV/5PIcvVlUeyQY8ATHx7GFYvmegUqoFIX3Ph5o4v12997rmzhaLag0qigOtZ6O3/Dg79BMbFyTdYz7LzHlmZ64ST3D/MRK76Hl73g4xSnUBNah3wysljPLcWn2WG+fAoRJ8ArwApJN85UWj+s9OPFjapxfGBNykYOoSTqEKspK+pbCUrPWY6yEDtTjUoTnyfKLSxQiCw/n4Hnxk7NqTAwLga441fymljgk3svdBTSnx00RP50SIRjm0HdGhO9XOWM04ba48nGHnLlpIlqPmFNaqFXlwePXu7UZOMYzJmxfksj5XlX4HZA8G3LoUBaD8GJm3D0z/6jkrg=" # PYPI_PASS
-
-before_install:
-  - export LC_ALL=C.UTF-8
-  - export LANG=C.UTF-8
-  - pip3 install travis-sphinx
-  - docker pull scannerresearch/scanner:cpu-latest
-
-script: docker run -w /app -v $(pwd):/app scannerresearch/scanner:cpu-latest ./scripts/travis-build.sh
-
-after_success: ./scripts/travis-publish.sh
+  global:
+  - DOCKER_REPO=scannerresearch/scannertools
+  - DOCKER_EMAIL=wcrichto@cs.stanford.edu
+  - DOCKER_USER=wcrichto
+  - secure: M+N4gEsYsiF+zfFBSG7bvpmKNOff+c0uX1dUZ9/rFoBro7Lftsq3FvGuLMvfb9gzuNcWH9vSKf9fmUI6apeBxgVqFIzn/LiNhbdrVzg8P2IRtZ2GSDOmzyp0HDzL/bET8FncQLccKCG3Il3QmGstBTJ3cpxJqJ1O60CsnKGX+UlYr51yz53hPBETbgLsEFTNFXVifvgrKJumfBqjx2QdqkYTUQO6JjYbcUo3rlgqA6eSluCY/DgSB0xzaznB8XbdJkIi7B98E/zmxM6uJKAYXNR/Srv+jbcryjW9GXldYHbQad06O1bKK12UPnrCKIVVg9iHd/Mx7S9eqeueGOMAfozIAcGG+oOV/5PIcvVlUeyQY8ATHx7GFYvmegUqoFIX3Ph5o4v12997rmzhaLag0qigOtZ6O3/Dg79BMbFyTdYz7LzHlmZ64ST3D/MRK76Hl73g4xSnUBNah3wysljPLcWn2WG+fAoRJ8ArwApJN85UWj+s9OPFjapxfGBNykYOoSTqEKspK+pbCUrPWY6yEDtTjUoTnyfKLSxQiCw/n4Hnxk7NqTAwLga441fymljgk3svdBTSnx00RP50SIRjm0HdGhO9XOWM04ba48nGHnLlpIlqPmFNaqFXlwePXu7UZOMYzJmxfksj5XlX4HZA8G3LoUBaD8GJm3D0z/6jkrg=
+  - secure: 2Vons/Eaclk+6pBpkQ3phmAvXkMre5M+XwlyR6NN3dKlD7N+xXyUytkODUBRuISp/9R82gd0GI9H/ccY/yE8EhuNBjKbN4ernmC9NdFfS7RYSfgbdUH7J6LT9+FPeFchlsqv139fZfLkxC+MZf6derSZb0AeP67Ibn2mo4oh6YNflWD/gm7CKerA7in4eYIkPUubjtVyfSsQPRBTYQTdxXDXi3XOr3gnAgVwGcu9dS02n7AxVUdxGOJyEbZsvCjwE1s0h5BrezeUQ9EDJM07bqmI+yZxzY7ITxvBuIE+rcwc1dOLaNq3MAhVHML52Yjo9OKjto40UPvfAd8IFTmnWy2L3+y06XVj84fZvuatDLwwY77SzLaPwQ1iemmNT/NqjErr9BUQ8Rkz0cM8WqnaYHmcTbfU6A1pHGsfW1/A8fa99c7kmaYgYJCPhEWAHC9uonO+37y5DUnOxd4aW2bv5C+cfYCDkhErJluQyyGcaZINya7aZFi4L0U6iuAw/6tJDHvrSZiC5BFI6raxrNanoIoRe4YoPD7us4aVuGNzrjm0SDz9a5mjngGqCBkqIuYIKccmP9EjjUS+gudXtSsZj8Utw04BT8WczGOG9GhZAGJ4JDkUbAlpZFrQ/eiqUg1O009Y7EQpjyYY7253dhc8ohfkfbJ+DaEvnYh1y4Jnp94=
+  matrix:
+  - TAG=cpu
+  - TAG=gpu-9.1-cudnn7
+script: "./scripts/travis-build.sh"
+after_success: "./scripts/travis-publish.sh"

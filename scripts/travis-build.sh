@@ -1,18 +1,13 @@
 #!/bin/bash
 set -e
 
-# Download non-pip dependencies
-pushd /tmp
-git clone https://github.com/davidsandberg/facenet
-git clone https://github.com/scanner-research/rude-carnie
-export PYTHONPATH=/tmp/facenet/src:/tmp/rude-carnie:$PYTHONPATH
-popd
+yes | docker login -u="$DOCKER_USER" -p="$DOCKER_PASS"
 
-# Run unit tests
-pip3 install --upgrade setuptools
-python3 setup.py test
+docker build \
+       -t ${DOCKER_REPO}:${TAG}-latest \
+       --build-arg tag=${TAG} .
 
-# Build docs
-pip3 install travis-sphinx sphinx-nameko-theme
-sphinx-apidoc -f -o doc/source scannertools
-travis-sphinx build -s doc -n
+docker run ${DOCKER_REPO}:${TAG}-latest bash \
+       -c "python3 setup.py test"
+
+docker push ${DOCKER_REPO}:${TAG}-latest
