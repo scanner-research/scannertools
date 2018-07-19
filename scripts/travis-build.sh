@@ -8,6 +8,6 @@ docker build \
        --build-arg tag=${TAG} .
 
 docker run ${DOCKER_REPO}:${TAG}-latest bash \
-       -c "python3 setup.py test"
+       -c "cd /opt/scannertools && python3 setup.py test"
 
 docker push ${DOCKER_REPO}:${TAG}-latest
