@@ -13,6 +13,9 @@ env:
   - secure: 2Vons/Eaclk+6pBpkQ3phmAvXkMre5M+XwlyR6NN3dKlD7N+xXyUytkODUBRuISp/9R82gd0GI9H/ccY/yE8EhuNBjKbN4ernmC9NdFfS7RYSfgbdUH7J6LT9+FPeFchlsqv139fZfLkxC+MZf6derSZb0AeP67Ibn2mo4oh6YNflWD/gm7CKerA7in4eYIkPUubjtVyfSsQPRBTYQTdxXDXi3XOr3gnAgVwGcu9dS02n7AxVUdxGOJyEbZsvCjwE1s0h5BrezeUQ9EDJM07bqmI+yZxzY7ITxvBuIE+rcwc1dOLaNq3MAhVHML52Yjo9OKjto40UPvfAd8IFTmnWy2L3+y06XVj84fZvuatDLwwY77SzLaPwQ1iemmNT/NqjErr9BUQ8Rkz0cM8WqnaYHmcTbfU6A1pHGsfW1/A8fa99c7kmaYgYJCPhEWAHC9uonO+37y5DUnOxd4aW2bv5C+cfYCDkhErJluQyyGcaZINya7aZFi4L0U6iuAw/6tJDHvrSZiC5BFI6raxrNanoIoRe4YoPD7us4aVuGNzrjm0SDz9a5mjngGqCBkqIuYIKccmP9EjjUS+gudXtSsZj8Utw04BT8WczGOG9GhZAGJ4JDkUbAlpZFrQ/eiqUg1O009Y7EQpjyYY7253dhc8ohfkfbJ+DaEvnYh1y4Jnp94=
   matrix:
   - TAG=cpu
+  - TAG=gpu-8.0-cudnn6
+  - TAG=gpu-8.0-cudnn7
+  - TAG=gpu-9.0-cudnn7
   - TAG=gpu-9.1-cudnn7
 script: "./scripts/travis-build.sh"
 after_success: "./scripts/travis-publish.sh"
