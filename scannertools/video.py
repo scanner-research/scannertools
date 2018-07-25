@@ -1,5 +1,6 @@
 from .prelude import *
 from .audio import Audio
+import os
 
 
 class Video:
@@ -42,7 +43,7 @@ class Video:
             str: Name of the video file in the Scanner database.
         """
 
-        return self._scanner_name or self.path()
+        return self._scanner_name or os.path.basename(self.path())
 
     def width(self):
         """
@@ -116,7 +117,7 @@ class Video:
         to_fetch = sorted(list(set(numbers)))
         frames = self._decoder().retrieve(to_fetch)
         idx_map = {n: i for i, n in enumerate(to_fetch)}
-        
+
         return [frames[idx_map[n]].copy() for n in numbers]
 
     def audio(self):

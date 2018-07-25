@@ -5,9 +5,16 @@ import json
 import yaml
 import tempfile
 import argparse
+import scannerpy
+import os
+import signal
+import shlex
+import cloudpickle
+import base64
+
 
 def run(s):
-    return sp.check_output(s, shell=True)
+    return sp.check_output(s, shell=True).decode('utf-8').strip()
 
 
 @attrs
@@ -16,6 +23,18 @@ class CloudConfig:
     service_key = attrib(type=str)
     storage_key_id = attrib(type=str)
     storage_key_secret = attrib(type=str)
+
+    @service_key.default
+    def _service_key_default(self):
+        return os.environ['GOOGLE_APPLICATION_CREDENTIALS']
+
+    @storage_key_id.default
+    def _storage_key_id_default(self):
+        return os.environ['AWS_ACCESS_KEY_ID']
+
+    @storage_key_secret.default
+    def _storage_key_secret_default(self):
+        return os.environ['AWS_SECRET_ACCESS_KEY']
 
 
 @attrs
@@ -37,13 +56,14 @@ class MachineConfig:
 class ClusterConfig:
     id = attrib(type=str)
     num_workers = attrib(type=int)
-    zone = attrib(type=str, default='us-east1-d')
+    zone = attrib(type=str, default='us-east1-b')
     kube_version = attrib(type=str, default='1.9.7-gke.3')
-    master = attrib(type=MachineConfig, default=MachineConfig(cpu=4, mem=96, disk=50))
-    worker = attrib(type=MachineConfig, default=MachineConfig(cpu=64, mem=256, disk=500))
+    master = attrib(type=MachineConfig, default=MachineConfig(cpu=4, mem=96, disk=100))
+    worker = attrib(type=MachineConfig, default=MachineConfig(cpu=64, mem=256, disk=100))
     workers_per_node = attrib(type=int, default=1)
     preemptible = attrib(type=bool, default=False)
     autoscale = attrib(type=bool, default=False)
+    no_workers_timeout = attrib(type=int, default=600)
     scopes = attrib(
         type=list,
         default=[
@@ -55,6 +75,9 @@ class ClusterConfig:
             "https://www.googleapis.com/auth/service.management.readonly",
             "https://www.googleapis.com/auth/trace.append"
         ])
+    scanner_config = attrib(
+        type=str, default=os.path.join(os.environ['HOME'], '.scanner/config.toml'))
+    pipelines = attrib(type=list, default=[])
 
 
 class Cluster:
@@ -65,14 +88,12 @@ class Cluster:
             .format(self._cloud_config.project, self._cluster_config.zone)
 
     def get_kube_info(self, kind, namespace='default'):
-        return json.loads(
-            run('kubectl get {} -o json -n {}'.format(kind, namespace)).decode('utf-8'))
+        return json.loads(run('kubectl get {} -o json -n {}'.format(kind, namespace)))
 
     def get_by_owner(self, ty, owner, namespace='default'):
         return run(
             'kubectl get {} -o json -n {} | jq \'.items[] | select(.metadata.ownerReferences[0].name == "{}") | .metadata.name\'' \
-            .format(ty, namespace, owner)) \
-            .decode('utf-8').strip()[1:-1]
+            .format(ty, namespace, owner)[1:-1])
 
     def get_object(self, info, name):
         for item in info['items']:
@@ -96,7 +117,7 @@ class Cluster:
 
     def running(self):
         return run('{cmd} list --format=json | jq \'.[] | select(.name == "{id}")\''.format(
-            cmd=self._cluster_cmd, id=self._cluster_config.id)) != b''
+            cmd=self._cluster_cmd, id=self._cluster_config.id)) != ''
 
     def machine_start(self):
         cfg = self._cluster_config
@@ -117,7 +138,6 @@ class Cluster:
 
         cluster_cmd = """
 {cmd} -q create "{cluster_id}" \
-        --enable-kubernetes-alpha \
         --cluster-version "{cluster_version}" \
         --machine-type "{master_machine}" \
         --image-type "COS" \
@@ -128,6 +148,7 @@ class Cluster:
         {accelerator}
         """.format(**fmt_args)
 
+        print('Creating master...')
         run(cluster_cmd)
 
         fmt_args['cmd'] = fmt_args['cmd'].replace('clusters', 'node-pools')
@@ -144,9 +165,11 @@ class Cluster:
         {accelerator}
         """.format(**fmt_args)
 
+        print('Creating workers...')
         run(pool_cmd)
 
         # Wait for cluster to enter reconciliation if it's going to occur
+        print('Waiting for cluster to reconcile...')
         if cfg.num_workers > 1:
             time.sleep(60)
 
@@ -155,7 +178,7 @@ class Cluster:
         while True:
             cluster_status = run(
                 '{cmd} list --format=json | jq -r \'.[] | select(.name == "{id}") | .status\''.
-                format(cmd=self._cluster_cmd, id=cfg.id)).strip().decode('utf-8')
+                format(cmd=self._cluster_cmd, id=cfg.id))
 
             if cluster_status == 'RECONCILING':
                 time.sleep(5)
@@ -188,17 +211,23 @@ class Cluster:
         template = {
             'name': name,
             'image': 'gcr.io/{project}/scanner-{name}:{device}'.format(
-                project=self._cluster_config.id,
+                project=self._cloud_config.project,
                 name=name,
                 device='gpu' if self._cluster_config.worker.gpu > 0 else 'cpu'),
+            'command': ['/bin/bash'],
+            'args': ['-c', 'python3 -c "from scannertools import kube; kube.{}()"'.format(name)],
             'imagePullPolicy': 'Always',
             'volumeMounts': [{
                 'name': 'service-key',
                 'mountPath': '/secret'
+            }, {
+                'name': 'scanner-config',
+                'mountPath': '/root/.scanner/config.toml',
+                'subPath': 'config.toml'
             }],
             'env': [
                 {'name': 'GOOGLE_APPLICATION_CREDENTIALS',
-                 'value': '/secret/service-key.json'},
+                 'value': '/secret/{}'.format(os.path.basename(self._cloud_config.service_key))},
                 {'name': 'AWS_ACCESS_KEY_ID',
                  'valueFrom': {'secretKeyRef': {
                      'name': 'aws-storage-key',
@@ -209,6 +238,8 @@ class Cluster:
                      'name': 'aws-storage-key',
                      'key': 'AWS_SECRET_ACCESS_KEY'
                  }}},
+                {'name': 'NO_WORKERS_TIMEOUT',
+                 'value': str(self._cluster_config.no_workers_timeout)},
                 {'name': 'GLOG_minloglevel',
                  'value': '0'},
                 {'name': 'GLOG_logtostderr',
@@ -217,8 +248,8 @@ class Cluster:
                  'value': '1'},
                 {'name': 'WORKERS_PER_NODE',
                  'value': str(self._cluster_config.workers_per_node)},
-                {'name': 'DEPS',
-                 'value': ','.join([])}, # TODO(wcrichto)
+                {'name': 'PIPELINES',
+                 'value': base64.b64encode(cloudpickle.dumps(self._cluster_config.pipelines))},
                 # HACK(wcrichto): GPU decode for interlaced videos is broken, so forcing CPU
                 # decode instead for now.
                 {'name': 'FORCE_CPU_DECODE',
@@ -260,10 +291,13 @@ class Cluster:
                             'secret': {
                                 'secretName': 'service-key',
                                 'items': [{
-                                    'key': 'service-key.json',
-                                    'path': 'service-key.json'
+                                    'key': os.path.basename(self._cloud_config.service_key),
+                                    'path': os.path.basename(self._cloud_config.service_key)
                                 }]
                             }
+                        }, {
+                            'name': 'scanner-config',
+                            'configMap': {'name': 'scanner-config'}
                         }],
                         'nodeSelector': {
                             'cloud.google.com/gke-nodepool':
@@ -287,6 +321,7 @@ class Cluster:
             num_workers = cfg.num_workers
 
         if reset:
+            print('Deleting current deployments...')
             run('kubectl delete service --all')
             run('kubectl delete deploy --all')
 
@@ -299,6 +334,11 @@ class Cluster:
         if self.get_object(secrets, 'aws-storage-key') is None:
             run('kubectl create secret generic aws-storage-key --from-literal=AWS_ACCESS_KEY_ID={} --from-literal=AWS_SECRET_ACCESS_KEY={}' \
                 .format(self._cloud_config.storage_key_id, self._cloud_config.storage_key_secret))
+
+        configmaps = self.get_kube_info('configmaps')
+        if self.get_object(configmaps, 'scanner-config') is None:
+            run('kubectl create configmap scanner-config --from-file={}' \
+                .format(self._cluster_config.scanner_config))
 
         deployments = self.get_kube_info('deployments')
         print('Creating deployments...')
@@ -313,6 +353,7 @@ class Cluster:
             self.create_object(self.make_deployment('worker', num_workers))
 
     def resize(self, size):
+        print('Resizing cluster...')
         if not self._cluster_config.autoscale:
             run('{cmd} resize {id} -q --node-pool=workers --size={size}' \
                 .format(cmd=self._cluster_cmd, id=self._cluster_config.id, size=size))
@@ -320,20 +361,49 @@ class Cluster:
             run('{cmd} update {id} -q --node-pool=workers --enable-autoscaling --max-nodes={size}' \
                 .format(cmd=self._cluster_cmd, id=self._cluster_config.id, size=size))
 
+        print('Scaling deployment...')
         run('kubectl scale deploy/scanner-worker --replicas={}'.format(size))
 
     def delete(self):
         run('{cmd} delete {id}'.format(cmd=self._cluster_cmd, id=self._cluster_config.id))
 
+    def master_address(self):
+        ip = run('''
+            kubectl get pods -l 'app=scanner-master' -o json | \
+            jq '.items[0].spec.nodeName' -r | \
+            xargs -I {} kubectl get nodes/{} -o json | \
+            jq '.status.addresses[] | select(.type == "ExternalIP") | .address' -r
+            ''')
+
+        port = run('''
+            kubectl get svc/scanner-master -o json | \
+            jq '.spec.ports[0].nodePort' -r
+            ''')
+
+        return '{}:{}'.format(ip, port)
+
+    def database(self):
+        return scannerpy.Database(master=self.master_address(), start_cluster=False)
+
+    def wait_on_job(self):
+        db = self.database()
+        jobs = db.get_active_jobs()
+        if len(jobs) > 0:
+            db.wait_on_job(jobs[0])
+
     def cli(self):
         parser = argparse.ArgumentParser()
         command = parser.add_subparsers(dest='command')
+        command.required = True
         create = command.add_parser('start')
         create.add_argument('--reset', '-r', action='store_true', help='Delete current deployments')
-        create.add_argument('--num-workers', '-n', type=int, default=1, help='Initial number of workers')
+        create.add_argument(
+            '--num-workers', '-n', type=int, default=1, help='Initial number of workers')
         command.add_parser('delete')
         resize = command.add_parser('resize')
         resize.add_argument('size', type=int, help='Number of nodes')
+        command.add_parser('get-credentials')
+        command.add_parser('wait')
 
         args = parser.parse_args()
         if args.command == 'start':
@@ -346,3 +416,33 @@ class Cluster:
 
         elif args.command == 'resize':
             self.resize(args.size)
+
+        elif args.command == 'get-credentials':
+            self.get_credentials()
+
+        elif args.command == 'wait':
+            self.wait_on_job()
+
+
+def master():
+    print('Scannertools: starting master...')
+    scannerpy.start_master(
+        port='8080',
+        block=True,
+        watchdog=False,
+        no_workers_timeout=int(os.environ['NO_WORKERS_TIMEOUT']))
+
+
+def worker():
+    print('Scannertools: fetching resources...')
+    pipelines = cloudpickle.loads(base64.b64decode(os.environ['PIPELINES']))
+    for pipeline in pipelines:
+        pipeline(None).fetch_resources()
+
+    print('Scannertools: starting worker...')
+    scannerpy.start_worker(
+        '{}:{}'.format(os.environ['SCANNER_MASTER_SERVICE_HOST'],
+                       os.environ['SCANNER_MASTER_SERVICE_PORT']),
+        block=True,
+        watchdog=False,
+        port=5002)

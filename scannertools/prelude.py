@@ -18,6 +18,9 @@ import importlib
 from functools import wraps
 from abc import ABC
 import inspect
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from tqdm import tqdm
+import multiprocessing as mp
 
 STORAGE = None
 LOCAL_STORAGE = None
@@ -308,6 +311,7 @@ class Pipeline(ABC):
                 ScannerColumn(
                     self._db.table(t).column(col_name),
                     self.parser_fn() if self.parser_fn is not None else None)
+                if self._db.table(t).committed() else None
                 for t in self._sink.args
             ]
         else:
@@ -382,3 +386,11 @@ class VideoOutputPipeline(Pipeline):
             self._db.table(table).column('frame').save_mp4(os.path.splitext(p)[0])
 
         return paths
+
+def par_for(f, l, process=False, workers=None, progress=True):
+    Pool = ProcessPoolExecutor if process else ThreadPoolExecutor
+    with Pool(max_workers=mp.cpu_count() if workers is None else workers) as executor:
+        if progress:
+            return list(tqdm(executor.map(f, l), total=len(l)))
+        else:
+            return list(executor.map(f, l))

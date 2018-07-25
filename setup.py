@@ -9,7 +9,9 @@ setup(
     author_email='wcrichto@cs.stanford.edu',
     license='Apache 2.0',
     packages=['scannertools'],
-    install_requires=['requests', 'numpy', 'scipy', 'requests', 'attrs', 'pyyaml'],
+    install_requires=[
+        'requests', 'numpy', 'scipy', 'requests', 'attrs', 'pyyaml', 'cloudpickle', 'tqdm'
+    ],
     setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'tensorflow==1.5.0'],
+    tests_require=['pytest', 'tensorflow'],
     zip_safe=False)
