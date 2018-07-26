@@ -112,35 +112,6 @@ def imwrite(path, img):
     cv2.imwrite(path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 
-def autobatch(uniforms=[]):
-    def wrapper(fn):
-        @wraps(fn)
-        def newfn(*args, **kwargs):
-            positions = [x for x in uniforms if isinstance(x, int)]
-            keywords = [k for k in uniforms if isinstance(k, str)]
-
-            try:
-                nonuniform = args[next(iter(set(range(len(args))) - set(positions)))]
-            except StopIteration:
-                nonuniform = kwargs[next(iter(set(kwargs.keys()) - set(keywords)))]
-
-            batched = isinstance(nonuniform, list)
-            if not batched:
-                args = [[x] if i not in positions and x is not None else x
-                        for (i, x) in enumerate(args)]
-                kwargs = {
-                    k: [v] if k not in keywords and v is not None else v
-                    for k, v in kwargs.items()
-                }
-
-            res = fn(*args, **kwargs)
-            return res[0] if not batched else res
-
-        return newfn
-
-    return wrapper
-
-
 @contextmanager
 def sample_video(delete=True):
     import requests
@@ -320,12 +291,12 @@ class Pipeline(ABC):
     def build_pipeline(self):
         raise NotImplemented
 
-    def execute(self, source_args={}, sink_args={}, output_args={}, run_opts={}, no_execute=False):
+    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, no_execute=False):
         self.fetch_resources()
 
         self._sources = self.build_sources(**source_args)
 
-        self._output_ops = self.build_pipeline()
+        self._output_ops = self.build_pipeline(**pipeline_args)
 
         self._sink = self.build_sink(**sink_args)
 
@@ -345,16 +316,19 @@ class Pipeline(ABC):
                 return list(inspect.signature(f).parameters.keys())
 
             source_arg_names = ['videos', 'frames'] + pipeline.additional_sources
+            pipeline_arg_names = method_arg_names(pipeline.build_pipeline)
             sink_arg_names = method_arg_names(pipeline.build_sink)
             output_arg_names = method_arg_names(pipeline.parse_output)
 
             source_args = {}
+            pipeline_args = {}
             sink_args = {}
             output_args = {}
 
             for k, v in kwargs.items():
                 found = False
                 for (names, dct) in [(source_arg_names, source_args), \
+                                     (pipeline_arg_names, pipeline_args), \
                                      (sink_arg_names, sink_args), \
                                      (output_arg_names, output_args)]:
                     if k in names:
@@ -367,6 +341,7 @@ class Pipeline(ABC):
 
             return pipeline.execute(
                 source_args=source_args,
+                pipeline_args=pipeline_args,
                 sink_args=sink_args,
                 output_args=output_args,
                 run_opts=run_opts,

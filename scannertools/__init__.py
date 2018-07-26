@@ -7,6 +7,7 @@ from . import object_detection
 from . import gender_detection
 from . import face_embedding
 from . import optical_flow
+from . import clothing_detection
 from . import tf_vis_utils
 from . import vis
 from . import bboxes

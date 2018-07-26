@@ -1,12 +1,6 @@
 import pytest
 import scannertools as st
-import scannertools.object_detection as object_detection
-import scannertools.face_detection as face_detection
-import scannertools.optical_flow as optical_flow
-import scannertools.shot_detection as shot_detection
-import scannertools.pose_detection as pose_detection
-import scannertools.gender_detection as gender_detection
-import scannertools.face_embedding as face_embedding
+from scannertools import *
 import scannerpy
 import os
 import subprocess as sp
@@ -93,6 +87,13 @@ def test_gender_detection(db, video):
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
     genders = gender_detection.detect_genders(db, videos=[video], frames=[[0]], bboxes=bboxes)
     next(genders[0].load())
+    # TODO: test output
+
+
+def test_clothing_detection(db, video):
+    bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
+    clothing = clothing_detection.detect_clothing(db, videos=[video], frames=[[0]], bboxes=bboxes)
+    next(clothing[0].load())
     # TODO: test output
 
 
