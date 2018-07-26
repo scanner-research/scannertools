@@ -8,6 +8,8 @@ import tempfile
 import toml
 import shutil
 
+# TODO: test output on all the pipelines
+
 try:
     sp.check_call(['nvidia-smi'])
     has_gpu = True
@@ -87,21 +89,18 @@ def test_gender_detection(db, video):
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
     genders = gender_detection.detect_genders(db, videos=[video], frames=[[0]], bboxes=bboxes)
     next(genders[0].load())
-    # TODO: test output
 
 
 def test_clothing_detection(db, video):
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
     clothing = clothing_detection.detect_clothing(db, videos=[video], frames=[[0]], bboxes=bboxes)
     next(clothing[0].load())
-    # TODO: test output
 
 
 def test_face_embedding(db, video):
     bboxes = face_detection.detect_faces(db, videos=[video], frames=[[0]])
     embeddings = face_embedding.embed_faces(db, videos=[video], frames=[[0]], bboxes=bboxes)
     next(embeddings[0].load())
-    # TODO: test output
 
 
 def test_montage(video):
@@ -109,11 +108,12 @@ def test_montage(video):
 
 
 def test_optical_flow(db, video):
-    optical_flow.compute_flow(db, videos=[video], frames=[[1]])
+    flows = optical_flow.compute_flow(db, videos=[video], frames=[[1]])
+    next(flows[0].load())
 
 
 def test_shot_detection(db, video):
-    shot_detection.detect_shots(db, videos=[video])
+    shot_detection.detect_shots(db, videos=[video], run_opts={'work_packet_size': 10})
 
 
 @needs_gpu
