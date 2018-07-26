@@ -109,7 +109,6 @@ def test_montage(video):
 
 def test_optical_flow(db, video):
     flows = optical_flow.compute_flow(db, videos=[video], frames=[[1]])
-    next(flows[0].load())
 
 
 def test_shot_detection(db, video):
