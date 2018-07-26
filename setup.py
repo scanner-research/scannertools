@@ -13,5 +13,5 @@ setup(
         'requests', 'numpy', 'scipy', 'requests', 'attrs', 'pyyaml', 'cloudpickle', 'tqdm'
     ],
     setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'tensorflow'],
+    tests_require=['pytest', 'tensorflow', 'torch==0.3.1', 'torchvision'],
     zip_safe=False)
