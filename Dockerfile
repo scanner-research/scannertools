@@ -4,6 +4,7 @@ ARG tag2
 
 WORKDIR /opt
 RUN if [ "$tag2" = "cpu" ]; then pip3 install tensorflow==1.5.0; else pip3 install tensorflow-gpu==1.5.0; fi
+RUN pip3 install torch==0.3.1 torchvision
 RUN git clone https://github.com/davidsandberg/facenet && \
     git clone https://github.com/scanner-research/rude-carnie
 ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
