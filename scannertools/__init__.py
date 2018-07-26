@@ -5,6 +5,7 @@ from . import pose_detection
 from . import shot_detection
 from . import object_detection
 from . import gender_detection
+from . import face_detection
 from . import face_embedding
 from . import optical_flow
 from . import clothing_detection
