@@ -214,6 +214,7 @@ class ScannerColumn(DataSource):
 class Pipeline(ABC):
     job_suffix = None
     parser_fn = None
+    base_sources = ['videos', 'frames']
     additional_sources = []
     run_opts = {}
 
@@ -315,7 +316,7 @@ class Pipeline(ABC):
             def method_arg_names(f):
                 return list(inspect.signature(f).parameters.keys())
 
-            source_arg_names = ['videos', 'frames'] + pipeline.additional_sources
+            source_arg_names = pipeline.base_sources + pipeline.additional_sources + method_arg_names(pipeline.build_sources)
             pipeline_arg_names = method_arg_names(pipeline.build_pipeline)
             sink_arg_names = method_arg_names(pipeline.build_sink)
             output_arg_names = method_arg_names(pipeline.parse_output)
