@@ -7,6 +7,7 @@ Scannertools is a high-level Python library for scalable video analysis built on
 * [Face embedding](https://github.com/scanner-research/scannertools/blob/master/examples/face_embedding.py)
 * [Gender detection](https://github.com/scanner-research/scannertools/blob/master/examples/gender_detection.py)
 * [Pose detection](https://github.com/scanner-research/scannertools/blob/master/examples/pose_detection.py)
+* [Clothing detection](https://github.com/scanner-research/scannertools/blob/master/examples/clothing_detection.py)
 * [Optical flow](https://github.com/scanner-research/scannertools/blob/master/examples/optical_flow.py)
 * [Shot detection](https://github.com/scanner-research/scannertools/blob/master/examples/shot_detection.py)
 * [Random frame access](https://github.com/scanner-research/scannertools/blob/master/examples/frame_montage.py)

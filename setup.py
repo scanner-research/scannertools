@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='scannertools',
-    version='0.2.10.1',
+    version='0.2.15',
     description='Video analytics toolkit',
     url='http://github.com/scanner-research/scannertools',
     author='Will Crichton',
