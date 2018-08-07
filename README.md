@@ -48,14 +48,33 @@ For more examples, see the [examples](https://github.com/scanner-research/scanne
 
 ## Installation
 
-Scannertools requires the Python packages for our three libraries [Scanner](https://github.com/scanner-research/scanner/), [Storehouse](https://github.com/scanner-research/storehouse/), and [Hwang](https://github.com/scanner-research/hwang) to be installed. To get these, you can either use our prebuilt Docker image for Scanner ([`scannerresearch/scanner`](https://hub.docker.com/r/scannerresearch/scanner/)), or you can follow the [installation instructions](https://github.com/scanner-research/scanner/blob/master/INSTALL.md) in the Scanner repository. Note that scannertools has optional dependencies for certain pipelines, namely TensorFlow and OpenCV.
+Scannertools requires the Python packages for our three libraries [Scanner](https://github.com/scanner-research/scanner/), [Storehouse](https://github.com/scanner-research/storehouse/), and [Hwang](https://github.com/scanner-research/hwang) to be installed. Scannertools also has optional dependencies for certain pipelines, e.g. TensorFlow, OpenCV, and so on.
 
-**Note: scannertools currently only supports TensorFlow 1.5.**
+### Docker
 
-With the dependencies installed, just run:
+We recommend using our prebuilt Docker images for Scannertools ([`scannerresearch/scannertools`](https://hub.docker.com/r/scannerresearch/scanner/)). For example:
+
+```
+will@scannertools ~ ❯❯❯ docker run -ti scannerresearch/scannertools:cpu-latest bash
+root@7aec5a7d9198:/app# python3 /opt/scannertools/examples/face_detection.py
+...
+Wrote video with objects drawn to /app/sample_faces.mp4
+root@7aec5a7d9198:/app# exit
+will@scannertools ~ ❯❯❯ ls
+sample_faces.mp4
+```
+
+### Native
+
+To install from scratch, first follow the [installation instructions](https://github.com/scanner-research/scanner/blob/master/INSTALL.md) in the Scanner repository to get Scanner, Storehouse, and Hwang. Then run:
 
 ```
 pip install scannertools
 ```
 
-Then try running any of the examples!
+You will need to download dependencies for different pipelines. Currently you need:
+* Face detection and face recognition: [facenet](https://github.com/davidsandberg/facenet)
+* Gender detection: [rude-carnie](https://github.com/dpressel/rude-carnie)
+* Clothing detection: `pip install torch==0.3.1 torchvision`
+
+See the [Dockerfile](https://github.com/scanner-research/scannertools/blob/master/Dockerfile) for how to set up the PYTHONPATH appropriately for these dependencies.

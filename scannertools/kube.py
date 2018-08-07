@@ -11,6 +11,10 @@ import signal
 import shlex
 import cloudpickle
 import base64
+import math
+
+MASTER_POOL = 'default-pool'
+WORKER_POOL = 'workers'
 
 
 def run(s):
@@ -46,9 +50,22 @@ class MachineConfig:
     gpu_type = attrib(type=str, default='nvidia-tesla-p100')
 
     def type_name(self):
-        name = 'custom-{}-{}'.format(self.cpu, self.mem * 1024)
-        if float(self.mem) / self.cpu > 6.5:
-            name += '-ext'
+        # See Google Cloud documentation for instance names.
+        # https://cloud.google.com/compute/pricing#machinetype
+
+        name = None
+        mem_cpu_ratio = float(self.mem) / self.cpu
+        if math.log2(self.cpu).is_integer():
+            ratios = {'standard': 3.75, 'highmem': 6.5, 'highcpu': 0.9}
+            for k, ratio in ratios.items():
+                if math.isclose(mem_cpu_ratio, ratio):
+                    name = 'n1-{}-{}'.format(k, self.cpu)
+
+        if name is None:
+            name = 'custom-{}-{}'.format(self.cpu, self.mem * 1024)
+            if mem_cpu_ratio > 6.5:
+                name += '-ext'
+
         return name
 
 
@@ -115,88 +132,13 @@ class Cluster:
                 return pod
             time.sleep(1)
 
-    def running(self):
-        return run('{cmd} list --format=json | jq \'.[] | select(.name == "{id}")\''.format(
-            cmd=self._cluster_cmd, id=self._cluster_config.id)) != ''
-
-    def machine_start(self):
-        cfg = self._cluster_config
-        fmt_args = {
-            'cmd': self._cluster_cmd,
-            'cluster_id': cfg.id,
-            'cluster_version': cfg.kube_version,
-            'master_machine': cfg.master.type_name(),
-            'master_disk': cfg.master.disk,
-            'worker_machine': cfg.worker.type_name(),
-            'worker_disk': cfg.worker.disk,
-            'scopes': ','.join(cfg.scopes),
-            'initial_size': cfg.num_workers,
-            'accelerator': '--accelerator type={},count={}'.format(cfg.worker.gpu_type, cfg.worker.gpu) if cfg.worker.gpu > 0 else '',
-            'preemptible': '--preemptible' if cfg.preemptible else '',
-            'autoscaling': '--enable-autoscaling --min-nodes 0 --max-nodes {}'.format(cfg.num_workers) if cfg.autoscale else ''
-        }  # yapf: disable
-
-        cluster_cmd = """
-{cmd} -q create "{cluster_id}" \
-        --cluster-version "{cluster_version}" \
-        --machine-type "{master_machine}" \
-        --image-type "COS" \
-        --disk-size "{master_disk}" \
-        --scopes {scopes} \
-        --num-nodes "1" \
-        --enable-cloud-logging \
-        {accelerator}
-        """.format(**fmt_args)
-
-        print('Creating master...')
-        run(cluster_cmd)
-
-        fmt_args['cmd'] = fmt_args['cmd'].replace('clusters', 'node-pools')
-        pool_cmd = """
-{cmd} -q create workers \
-        --cluster "{cluster_id}" \
-        --machine-type "{worker_machine}" \
-        --image-type "COS" \
-        --disk-size "{worker_disk}" \
-        --scopes {scopes} \
-        --num-nodes "{initial_size}" \
-        {autoscaling} \
-        {preemptible} \
-        {accelerator}
-        """.format(**fmt_args)
-
-        print('Creating workers...')
-        run(pool_cmd)
-
-        # Wait for cluster to enter reconciliation if it's going to occur
-        print('Waiting for cluster to reconcile...')
-        if cfg.num_workers > 1:
-            time.sleep(60)
-
-        # If we requested workers up front, we have to wait for the cluster to reconcile while
-        # they are being allocated
-        while True:
-            cluster_status = run(
-                '{cmd} list --format=json | jq -r \'.[] | select(.name == "{id}") | .status\''.
-                format(cmd=self._cluster_cmd, id=cfg.id))
-
-            if cluster_status == 'RECONCILING':
-                time.sleep(5)
-            else:
-                if cluster_status != 'RUNNING':
-                    raise Exception(
-                        'Expected cluster status RUNNING, got: {}'.format(cluster_status))
-                break
-
-        if cfg.worker.gpu > 0:
-            # Install GPU drivers
-            # https://cloud.google.com/kubernetes-engine/docs/concepts/gpus#installing_drivers
-            run('kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/stable/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
-                )
-
-        print(
-            'https://console.cloud.google.com/kubernetes/clusters/details/{zone}/{cluster_id}?project={project}&tab=details' \
-            .format(zone=cfg.zone, project=self._cloud_config.project, **fmt_args))
+    def running(self, pool=MASTER_POOL):
+        return run(
+            '{cmd} list --cluster={id} --format=json | jq \'.[] | select(.name == "{pool}")\''.
+            format(
+                cmd=self._cluster_cmd.replace('clusters', 'node-pools'),
+                id=self._cluster_config.id,
+                pool=pool)) != ''
 
     def get_credentials(self):
         run('{cmd} get-credentials {id}'.format(cmd=self._cluster_cmd, id=self._cluster_config.id))
@@ -301,7 +243,7 @@ class Cluster:
                         }],
                         'nodeSelector': {
                             'cloud.google.com/gke-nodepool':
-                            'default-pool' if name == 'master' else 'workers'
+                            MASTER_POOL if name == 'master' else WORKER_POOL
                         }
                     }
                 }
@@ -310,9 +252,88 @@ class Cluster:
 
         return template
 
-    def kube_start(self, reset=True):
-        self.get_credentials()
+    def _cluster_start(self):
+        cfg = self._cluster_config
+        fmt_args = {
+            'cmd': self._cluster_cmd,
+            'cluster_id': cfg.id,
+            'cluster_version': cfg.kube_version,
+            'master_machine': cfg.master.type_name(),
+            'master_disk': cfg.master.disk,
+            'worker_machine': cfg.worker.type_name(),
+            'worker_disk': cfg.worker.disk,
+            'scopes': ','.join(cfg.scopes),
+            'initial_size': cfg.num_workers,
+            'accelerator': '--accelerator type={},count={}'.format(cfg.worker.gpu_type, cfg.worker.gpu) if cfg.worker.gpu > 0 else '',
+            'preemptible': '--preemptible' if cfg.preemptible else '',
+            'autoscaling': '--enable-autoscaling --min-nodes 0 --max-nodes {}'.format(cfg.num_workers) if cfg.autoscale else ''
+        }  # yapf: disable
 
+        cluster_cmd = """
+{cmd} -q create "{cluster_id}" \
+        --cluster-version "{cluster_version}" \
+        --machine-type "{master_machine}" \
+        --image-type "COS" \
+        --disk-size "{master_disk}" \
+        --scopes {scopes} \
+        --num-nodes "1" \
+        --enable-cloud-logging \
+        {accelerator}
+        """.format(**fmt_args)
+
+        if not self.running(pool=MASTER_POOL):
+            print('Creating master...')
+            run(cluster_cmd)
+
+        fmt_args['cmd'] = fmt_args['cmd'].replace('clusters', 'node-pools')
+        pool_cmd = """
+{cmd} -q create workers \
+        --cluster "{cluster_id}" \
+        --machine-type "{worker_machine}" \
+        --image-type "COS" \
+        --disk-size "{worker_disk}" \
+        --scopes {scopes} \
+        --num-nodes "{initial_size}" \
+        {autoscaling} \
+        {preemptible} \
+        {accelerator}
+        """.format(**fmt_args)
+
+        if not self.running(pool=WORKER_POOL):
+            print('Creating workers...')
+            run(pool_cmd)
+
+            # Wait for cluster to enter reconciliation if it's going to occur
+            print('Waiting for cluster to reconcile...')
+            if cfg.num_workers > 1:
+                time.sleep(60)
+
+            # If we requested workers up front, we have to wait for the cluster to reconcile while
+            # they are being allocated
+            while True:
+                cluster_status = run(
+                    '{cmd} list --format=json | jq -r \'.[] | select(.name == "{id}") | .status\''.
+                    format(cmd=self._cluster_cmd, id=cfg.id))
+
+                if cluster_status == 'RECONCILING':
+                    time.sleep(5)
+                else:
+                    if cluster_status != 'RUNNING':
+                        raise Exception(
+                            'Expected cluster status RUNNING, got: {}'.format(cluster_status))
+                    break
+
+            if cfg.worker.gpu > 0:
+                # Install GPU drivers
+                # https://cloud.google.com/kubernetes-engine/docs/concepts/gpus#installing_drivers
+                run('kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/stable/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
+                    )
+
+            print(
+                'https://console.cloud.google.com/kubernetes/clusters/details/{zone}/{cluster_id}?project={project}&tab=details' \
+                .format(zone=cfg.zone, project=self._cloud_config.project, **fmt_args))
+
+    def _kube_start(self, reset):
         cfg = self._cluster_config
         deploy = self.get_object(self.get_kube_info('deployments'), 'scanner-worker')
         if deploy is not None and cfg.num_workers == 1:
@@ -351,6 +372,11 @@ class Cluster:
 
         if self.get_object(deployments, 'scanner-worker') is None:
             self.create_object(self.make_deployment('worker', num_workers))
+
+    def start(self, reset=True):
+        self._cluster_start()
+        self.get_credentials()
+        self._kube_start(reset)
 
     def resize(self, size):
         print('Resizing cluster...')
@@ -407,9 +433,7 @@ class Cluster:
 
         args = parser.parse_args()
         if args.command == 'start':
-            if not self.running():
-                self.machine_start()
-            self.kube_start()
+            self.start()
 
         elif args.command == 'delete':
             self.delete()
