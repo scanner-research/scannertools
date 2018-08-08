@@ -19,6 +19,7 @@ travis-sphinx deploy
 if [ -n "$TRAVIS_TAG" ];
 then
     docker run -v $(pwd):/opt/scannertools $DOCKER_REPO:cpu-latest bash -c "
+cd /opt/scannertools
 pip3 install twine
 python3 setup.py bdist_wheel
 twine upload -u 'wcrichto' -p '${PYPI_PASS}' dist/*
