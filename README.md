@@ -65,10 +65,11 @@ will@scannertools ~ ❯❯❯ ls
 sample_faces.mp4
 ```
 
-If you want to use our GPU images, then you need to install the appropriate NVIDIA drivers and [nvidia-docker](https://github.com/NVIDIA/nvidia-docker#quickstart). Then run docker with the `--runtime nvidia` flag, e.g.
+If you want to use our GPU images, then you need to install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker#quickstart). Then run Docker with the `--runtime nvidia` flag, e.g.
 
 ```
-will@scannertools ~ ❯❯❯ docker run --runtime nvidia -ti scannerresearch/scannertools:gpu-9.0-cudnn7-latest bash
+will@scannertools ~ ❯❯❯ docker run --runtime nvidia \
+    -ti scannerresearch/scannertools:gpu-9.0-cudnn7-latest bash
 ```
 
 ### Native
