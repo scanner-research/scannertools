@@ -8,14 +8,13 @@ WINDOW_SIZE = 500
 class ShotDetectionPipeline(Pipeline):
     job_suffix = 'hist'
     parser_fn = lambda _: readers.histograms
-    run_opts = {'work_packet_size': 10000}
 
     def build_pipeline(self):
         return {
             'histogram':
             self._db.ops.Histogram(
-                frame=self._sources['frame'].op,
-                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
+                frame=self._sources['frame_sampled'].op,
+                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU)
         }
 
     def _compute_shot_boundaries(self, hists):

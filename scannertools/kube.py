@@ -12,13 +12,19 @@ import shlex
 import cloudpickle
 import base64
 import math
+import traceback
+from abc import ABC
 
 MASTER_POOL = 'default-pool'
 WORKER_POOL = 'workers'
 
 
-def run(s):
-    return sp.check_output(s, shell=True).decode('utf-8').strip()
+def run(s, detach=False):
+    if detach:
+        sp.Popen(s, shell=True, stdout=sp.PIPE, stderr=sp.PIPE)
+        return None
+    else:
+        return sp.check_output(s, shell=True).decode('utf-8').strip()
 
 
 @attrs
@@ -41,23 +47,53 @@ class CloudConfig:
         return os.environ['AWS_SECRET_ACCESS_KEY']
 
 
+class MachineType(ABC):
+    def get_cpu(self):
+        raise NotImplemented
+
+    def get_mem(self):
+        raise NotImplemented
+
+    def get_name(self):
+        raise NotImplemented
+
+
+GCP_MEM_RATIOS = {'standard': 3.75, 'highmem': 6.5, 'highcpu': 0.9}
+
+
 @attrs
-class MachineConfig:
+class MachineTypeName(MachineType):
+    name = attrib(type=str)
+
+    def get_cpu(self):
+        return int(self.name.split('-')[2])
+
+    def get_mem(self):
+        ty = self.name.split('-')[1]
+        return int(GCP_MEM_RATIOS[ty] * self.get_cpu())
+
+    def get_name(self):
+        return self.name
+
+
+@attrs
+class MachineTypeQuantity(MachineType):
     cpu = attrib(type=int)
     mem = attrib(type=int)
-    disk = attrib(type=int)
-    gpu = attrib(type=int, default=0)
-    gpu_type = attrib(type=str, default='nvidia-tesla-p100')
 
-    def type_name(self):
+    def get_cpu(self):
+        return self.cpu
+
+    def get_mem(self):
+        return self.mem
+
+    def get_name(self):
         # See Google Cloud documentation for instance names.
         # https://cloud.google.com/compute/pricing#machinetype
-
         name = None
         mem_cpu_ratio = float(self.mem) / self.cpu
         if math.log2(self.cpu).is_integer():
-            ratios = {'standard': 3.75, 'highmem': 6.5, 'highcpu': 0.9}
-            for k, ratio in ratios.items():
+            for k, ratio in GCP_MEM_RATIOS.items():
                 if math.isclose(mem_cpu_ratio, ratio):
                     name = 'n1-{}-{}'.format(k, self.cpu)
 
@@ -70,15 +106,79 @@ class MachineConfig:
 
 
 @attrs
+class MachineConfig:
+    type = attrib(type=MachineType)
+    disk = attrib(type=int)
+    gpu = attrib(type=int, default=0)
+    gpu_type = attrib(type=str, default='nvidia-tesla-p100')
+    preemptible = attrib(type=bool, default=False)
+
+    def price(self):
+        parts = self.type.get_name().split('-')
+        category = parts[0]
+        preempt = 'preemptible' if self.preemptible else 'normal'
+        p = 0
+
+        if category == 'n1':
+            prices = {
+                'normal': {
+                    'standard': 0.0475,
+                    'highmem': 0.1184 / 2,
+                    'highcpu': 0.0709 / 2
+                },
+                'preemptible': {
+                    'standard': 0.01,
+                    'highmem': 0.0125,
+                    'highcpu': 0.0075
+                }
+            }
+            p = prices[preempt][parts[1]] * int(parts[2])
+
+        elif category == 'custom':
+            [cpu, mem] = parts[1:3]
+            cpu = int(cpu)
+            mem = int(mem)
+            prices = {
+                'normal': {
+                    'cpu': 0.033174,
+                    'mem': 0.004446,
+                },
+                'preemptible': {
+                    'cpu': 0.00698,
+                    'mem': 0.00094
+                }
+            }
+            p = prices[preempt]['cpu'] * cpu + prices[preempt]['mem'] * (mem / 1024)
+
+        else:
+            raise Exception('Invalid category {}'.format(category))
+
+        gpu_prices = {
+            'normal': {
+                'nvidia-tesla-k80': 0.45,
+                'nvidia-tesla-p100': 1.46,
+                'nvidia-tesla-v100': 2.48
+            },
+            'preemptible': {
+                'nvidia-tesla-k80': 0.135,
+                'nvidia-tesla-p100': 0.43,
+                'nvidia-tesla-v100': 0.74
+            }
+        }
+
+        p += gpu_prices[preempt][self.gpu_type] * self.gpu
+        return p
+
+
+@attrs
 class ClusterConfig:
     id = attrib(type=str)
     num_workers = attrib(type=int)
+    master = attrib(type=MachineConfig)
+    worker = attrib(type=MachineConfig)
     zone = attrib(type=str, default='us-east1-b')
     kube_version = attrib(type=str, default='1.9.7-gke.3')
-    master = attrib(type=MachineConfig, default=MachineConfig(cpu=4, mem=96, disk=100))
-    worker = attrib(type=MachineConfig, default=MachineConfig(cpu=64, mem=256, disk=100))
     workers_per_node = attrib(type=int, default=1)
-    preemptible = attrib(type=bool, default=False)
     autoscale = attrib(type=bool, default=False)
     no_workers_timeout = attrib(type=int, default=600)
     scopes = attrib(
@@ -212,7 +312,7 @@ class Cluster:
         else:
             if name == 'worker':
                 template['resources']['requests'] = {
-                    'cpu': self._cluster_config.worker.cpu / 2.0 + 0.1
+                    'cpu': self._cluster_config.worker.type.get_cpu() / 2.0 + 0.1
                 }
 
         return template
@@ -258,15 +358,17 @@ class Cluster:
             'cmd': self._cluster_cmd,
             'cluster_id': cfg.id,
             'cluster_version': cfg.kube_version,
-            'master_machine': cfg.master.type_name(),
+            'master_machine': cfg.master.type.get_name(),
             'master_disk': cfg.master.disk,
-            'worker_machine': cfg.worker.type_name(),
+            'worker_machine': cfg.worker.type.get_name(),
             'worker_disk': cfg.worker.disk,
             'scopes': ','.join(cfg.scopes),
             'initial_size': cfg.num_workers,
             'accelerator': '--accelerator type={},count={}'.format(cfg.worker.gpu_type, cfg.worker.gpu) if cfg.worker.gpu > 0 else '',
-            'preemptible': '--preemptible' if cfg.preemptible else '',
-            'autoscaling': '--enable-autoscaling --min-nodes 0 --max-nodes {}'.format(cfg.num_workers) if cfg.autoscale else ''
+            'preemptible': '--preemptible' if cfg.worker.preemptible else '',
+            'autoscaling': '--enable-autoscaling --min-nodes 0 --max-nodes {}'.format(cfg.num_workers) if cfg.autoscale else '',
+            'master_cpu_platform': '--min-cpu-platform skylake' if cfg.master.type.get_cpu() > 64 else '',
+            'worker_cpu_platform': '--min-cpu-platform skylake' if cfg.worker.type.get_cpu() > 64 else ''
         }  # yapf: disable
 
         cluster_cmd = """
@@ -278,60 +380,48 @@ class Cluster:
         --scopes {scopes} \
         --num-nodes "1" \
         --enable-cloud-logging \
-        {accelerator}
+        {accelerator} \
+        {master_cpu_platform}
         """.format(**fmt_args)
 
         if not self.running(pool=MASTER_POOL):
+            try:
+                price = cfg.master.price() + cfg.worker.price() * cfg.num_workers
+                print('Cluster price: ${:.2f}/hr'.format(price))
+            except Exception:
+                print('Failed to compute cluster price with error:')
+                traceback.print_exc()
+
             print('Creating master...')
             run(cluster_cmd)
-
-        fmt_args['cmd'] = fmt_args['cmd'].replace('clusters', 'node-pools')
-        pool_cmd = """
-{cmd} -q create workers \
-        --cluster "{cluster_id}" \
-        --machine-type "{worker_machine}" \
-        --image-type "COS" \
-        --disk-size "{worker_disk}" \
-        --scopes {scopes} \
-        --num-nodes "{initial_size}" \
-        {autoscaling} \
-        {preemptible} \
-        {accelerator}
-        """.format(**fmt_args)
-
-        if not self.running(pool=WORKER_POOL):
-            print('Creating workers...')
-            run(pool_cmd)
-
-            # Wait for cluster to enter reconciliation if it's going to occur
-            print('Waiting for cluster to reconcile...')
-            if cfg.num_workers > 1:
-                time.sleep(60)
-
-            # If we requested workers up front, we have to wait for the cluster to reconcile while
-            # they are being allocated
-            while True:
-                cluster_status = run(
-                    '{cmd} list --format=json | jq -r \'.[] | select(.name == "{id}") | .status\''.
-                    format(cmd=self._cluster_cmd, id=cfg.id))
-
-                if cluster_status == 'RECONCILING':
-                    time.sleep(5)
-                else:
-                    if cluster_status != 'RUNNING':
-                        raise Exception(
-                            'Expected cluster status RUNNING, got: {}'.format(cluster_status))
-                    break
-
-            if cfg.worker.gpu > 0:
-                # Install GPU drivers
-                # https://cloud.google.com/kubernetes-engine/docs/concepts/gpus#installing_drivers
-                run('kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/stable/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
-                    )
-
             print(
                 'https://console.cloud.google.com/kubernetes/clusters/details/{zone}/{cluster_id}?project={project}&tab=details' \
                 .format(zone=cfg.zone, project=self._cloud_config.project, **fmt_args))
+
+            fmt_args['cmd'] = fmt_args['cmd'].replace('clusters', 'node-pools')
+            pool_cmd = """
+    {cmd} -q create workers \
+            --cluster "{cluster_id}" \
+            --machine-type "{worker_machine}" \
+            --image-type "COS" \
+            --disk-size "{worker_disk}" \
+            --scopes {scopes} \
+            --num-nodes "{initial_size}" \
+            {autoscaling} \
+            {preemptible} \
+            {accelerator} \
+            {worker_cpu_platform}
+            """.format(**fmt_args)
+
+            print('Creating workers...')
+            run(pool_cmd, detach=True)
+
+        # TODO(wcrichto): run this if GPU driver daemon isn't running yet
+        if cfg.worker.gpu > 0:
+            # Install GPU drivers
+            # https://cloud.google.com/kubernetes-engine/docs/concepts/gpus#installing_drivers
+            run('kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/stable/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
+                )
 
     def _kube_start(self, reset):
         cfg = self._cluster_config
@@ -343,12 +433,13 @@ class Cluster:
 
         if reset:
             print('Deleting current deployments...')
-            run('kubectl delete service --all')
-            run('kubectl delete deploy --all')
+            run('kubectl delete deploy/scanner-master deploy/scanner-worker --ignore-not-found=true'
+                )
+            run('kubectl delete service/scanner-master --ignore-not-found=true')
 
         secrets = self.get_kube_info('secrets')
-        print('Making secrets...')
         if self.get_object(secrets, 'service-key') is None:
+            print('Making secrets...')
             run('kubectl create secret generic service-key --from-file={}' \
                 .format(self._cloud_config.service_key))
 
@@ -362,8 +453,8 @@ class Cluster:
                 .format(self._cluster_config.scanner_config))
 
         deployments = self.get_kube_info('deployments')
-        print('Creating deployments...')
         if self.get_object(deployments, 'scanner-master') is None:
+            print('Creating deployments...')
             self.create_object(self.make_deployment('master', 1))
 
         services = self.get_kube_info('services')
@@ -375,7 +466,11 @@ class Cluster:
 
     def start(self, reset=True):
         self._cluster_start()
-        self.get_credentials()
+
+        if self._cluster_config.id not in run(
+                'kubectl config view -o json | jq \'.["current-context"]\' -r'):
+            self.get_credentials()
+
         self._kube_start(reset)
 
     def resize(self, size):
@@ -411,7 +506,7 @@ class Cluster:
     def database(self):
         return scannerpy.Database(master=self.master_address(), start_cluster=False)
 
-    def wait_on_job(self):
+    def job_status(self):
         db = self.database()
         jobs = db.get_active_jobs()
         if len(jobs) > 0:
@@ -422,18 +517,19 @@ class Cluster:
         command = parser.add_subparsers(dest='command')
         command.required = True
         create = command.add_parser('start')
-        create.add_argument('--reset', '-r', action='store_true', help='Delete current deployments')
+        create.add_argument(
+            '--no-reset', '-nr', action='store_true', help='Delete current deployments')
         create.add_argument(
             '--num-workers', '-n', type=int, default=1, help='Initial number of workers')
         command.add_parser('delete')
         resize = command.add_parser('resize')
         resize.add_argument('size', type=int, help='Number of nodes')
         command.add_parser('get-credentials')
-        command.add_parser('wait')
+        command.add_parser('job-status')
 
         args = parser.parse_args()
         if args.command == 'start':
-            self.start()
+            self.start(reset=not args.no_reset)
 
         elif args.command == 'delete':
             self.delete()
@@ -444,8 +540,8 @@ class Cluster:
         elif args.command == 'get-credentials':
             self.get_credentials()
 
-        elif args.command == 'wait':
-            self.wait_on_job()
+        elif args.command == 'job-status':
+            self.job_status()
 
 
 def master():
@@ -464,9 +560,11 @@ def worker():
         pipeline(None).fetch_resources()
 
     print('Scannertools: starting worker...')
+    num_workers = int(os.environ['WORKERS_PER_NODE'])
     scannerpy.start_worker(
         '{}:{}'.format(os.environ['SCANNER_MASTER_SERVICE_HOST'],
                        os.environ['SCANNER_MASTER_SERVICE_PORT']),
         block=True,
         watchdog=False,
-        port=5002)
+        port=5002,
+        num_workers=num_workers if num_workers > 1 else None)

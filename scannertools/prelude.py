@@ -236,7 +236,8 @@ class Pipeline(ABC):
             map_ = {}
             for k in source_keys:
                 src = self._sources[k]
-                map_[src.op] = src.args[i]
+                if src.args is not None:
+                    map_[src.op] = src.args[i]
             map_[self._sink.op] = self._sink.args[i]
             jobs.append(Job(op_args=map_))
 
@@ -255,8 +256,12 @@ class Pipeline(ABC):
             op=frame, args=[self._db.table(v.scanner_name()).column('frame') for v in videos])
 
         if frames is not None:
-            frame_sampled = self._db.streams.Gather(frame)
-            sources['frame_sampled'] = BoundOp(op=frame_sampled, args=frames)
+            if isinstance(frames, list):
+                frame_sampled = self._db.streams.Gather(frame)
+                sources['frame_sampled'] = BoundOp(op=frame_sampled, args=frames)
+            else:
+                frame_sampled = frames(frame)
+                sources['frame_sampled'] = BoundOp(op=frame_sampled, args=None)
         else:
             frame_sampled = self._db.streams.Stride(frame)
             sources['frame_sampled'] = BoundOp(
@@ -292,7 +297,9 @@ class Pipeline(ABC):
     def build_pipeline(self):
         raise NotImplemented
 
-    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, no_execute=False):
+    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, no_execute=False, cpu_only=False):
+        self._cpu_only = cpu_only or not self._db.has_gpu()
+
         self.fetch_resources()
 
         self._sources = self.build_sources(**source_args)
@@ -310,7 +317,7 @@ class Pipeline(ABC):
 
     @classmethod
     def make_runner(cls):
-        def runner(db, run_opts={}, no_execute=False, **kwargs):
+        def runner(db, run_opts={}, no_execute=False, cpu_only=False, **kwargs):
             pipeline = cls(db)
 
             def method_arg_names(f):
@@ -346,6 +353,7 @@ class Pipeline(ABC):
                 sink_args=sink_args,
                 output_args=output_args,
                 run_opts=run_opts,
+                cpu_only=cpu_only,
                 no_execute=no_execute)
 
         return runner
