@@ -65,6 +65,12 @@ will@scannertools ~ ❯❯❯ ls
 sample_faces.mp4
 ```
 
+If you want to use our GPU images, then you need to install the appropriate NVIDIA drivers and [nvidia-docker](https://github.com/NVIDIA/nvidia-docker#quickstart). Then run docker with the `--runtime nvidia` flag, e.g.
+
+```
+will@scannertools ~ ❯❯❯ docker run --runtime nvidia -ti scannerresearch/scannertools:gpu-9.0-cudnn7-latest bash
+```
+
 ### Native
 
 To install from scratch, first follow the [installation instructions](https://github.com/scanner-research/scanner/blob/master/INSTALL.md) in the Scanner repository to get Scanner, Storehouse, and Hwang. Then run:
