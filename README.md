@@ -1,6 +1,6 @@
 # scannertools: video processing toolkit &nbsp; [![Build Status](https://travis-ci.org/scanner-research/scannertools.svg?branch=master)](https://travis-ci.org/scanner-research/scannertools)
 
-Scannertools is a high-level Python library for scalable video analysis built on the [Scanner](https://github.com/scanner-research/scanner/) video processing engine. Scannertools provides easy-to-use, off-the-shelf implementations of:
+Scannertools is a Python library of easy-to-use, off-the-shelf pipelines written using the [Scanner](https://github.com/scanner-research/scanner/) video processing engine. Scannertools provides implementations of:
 
 * [Object detection](https://github.com/scanner-research/scannertools/blob/master/examples/object_detection.py)
 * [Face detection](https://github.com/scanner-research/scannertools/blob/master/examples/face_detection.py)
