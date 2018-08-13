@@ -17,5 +17,5 @@ env:
   - TAG=gpu-8.0-cudnn7
   - TAG=gpu-9.0-cudnn7
   - TAG=gpu-9.1-cudnn7
-script: "./scripts/travis-build.sh"
-after_success: "./scripts/travis-publish.sh"
+script: "travis_retry ./scripts/travis-build.sh"
+after_success: "travis_retry ./scripts/travis-publish.sh"
