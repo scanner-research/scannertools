@@ -274,11 +274,11 @@ class Pipeline(ABC):
         return sources
 
     def build_sink(self):
-        # TODO(wcrichto): use input table name, not index
         return BoundOp(
             op=self._db.sinks.Column(columns=self._output_ops),
             args=[
-                '{}_{}'.format(i, self.job_suffix) for i in range(len(self._sources['frame'].args))
+                '{}_{}_{}'.format(arg._table.name(), arg.name(), self.job_suffix)
+                for arg in self._sources['frame'].args
             ])
 
     def parse_output(self):

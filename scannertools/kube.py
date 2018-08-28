@@ -107,6 +107,7 @@ class MachineTypeQuantity(MachineType):
 
 @attrs
 class MachineConfig:
+    image = attrib(type=str)
     type = attrib(type=MachineType)
     disk = attrib(type=int)
     gpu = attrib(type=int, default=0)
@@ -177,7 +178,7 @@ class ClusterConfig:
     master = attrib(type=MachineConfig)
     worker = attrib(type=MachineConfig)
     zone = attrib(type=str, default='us-east1-b')
-    kube_version = attrib(type=str, default='1.9.7-gke.3')
+    kube_version = attrib(type=str, default='latest')
     workers_per_node = attrib(type=int, default=1)
     autoscale = attrib(type=bool, default=False)
     no_workers_timeout = attrib(type=int, default=600)
@@ -249,13 +250,10 @@ class Cluster:
             f.flush()
             run('kubectl create -f {}'.format(f.name))
 
-    def make_container(self, name):
+    def make_container(self, name, machine_config):
         template = {
             'name': name,
-            'image': 'gcr.io/{project}/scanner-{name}:{device}'.format(
-                project=self._cloud_config.project,
-                name=name,
-                device='gpu' if self._cluster_config.worker.gpu > 0 else 'cpu'),
+            'image': machine_config.image,
             'command': ['/bin/bash'],
             'args': ['-c', 'python3 -c "from scannertools import kube; kube.{}()"'.format(name)],
             'imagePullPolicy': 'Always',
@@ -307,17 +305,17 @@ class Cluster:
                 'containerPort': 8080,
             }]
 
-        if self._cluster_config.worker.gpu > 0:
-            template['resources']['limits'] = {'nvidia.com/gpu': self._cluster_config.worker.gpu}
+        if machine_config.gpu > 0:
+            template['resources']['limits'] = {'nvidia.com/gpu': machine_config.gpu}
         else:
             if name == 'worker':
                 template['resources']['requests'] = {
-                    'cpu': self._cluster_config.worker.type.get_cpu() / 2.0 + 0.1
+                    'cpu': machine_config.type.get_cpu() / 2.0 + 0.1
                 }
 
         return template
 
-    def make_deployment(self, name, replicas):
+    def make_deployment(self, name, machine_config, replicas):
         template = {
             'apiVersion': 'apps/v1beta1',
             'kind': 'Deployment',
@@ -327,7 +325,7 @@ class Cluster:
                 'template': {
                     'metadata': {'labels': {'app': 'scanner-{}'.format(name)}},
                     'spec': {  # PodSpec
-                        'containers': [self.make_container(name)],
+                        'containers': [self.make_container(name, machine_config)],
                         'volumes': [{
                             'name': 'service-key',
                             'secret': {
@@ -414,7 +412,27 @@ class Cluster:
             """.format(**fmt_args)
 
             print('Creating workers...')
-            run(pool_cmd, detach=True)
+            run(pool_cmd)
+
+            # Wait for cluster to enter reconciliation if it's going to occur
+            print('Waiting for cluster to reconcile...')
+            if cfg.num_workers > 1:
+                time.sleep(60)
+
+            # If we requested workers up front, we have to wait for the cluster to reconcile while
+            # they are being allocated
+            while True:
+                cluster_status = run(
+                    '{cmd} list --format=json | jq -r \'.[] | select(.name == "{id}") | .status\''.
+                    format(cmd=self._cluster_cmd, id=cfg.id))
+
+                if cluster_status == 'RECONCILING':
+                    time.sleep(5)
+                else:
+                    if cluster_status != 'RUNNING':
+                        raise Exception(
+                            'Expected cluster status RUNNING, got: {}'.format(cluster_status))
+                    break
 
         # TODO(wcrichto): run this if GPU driver daemon isn't running yet
         if cfg.worker.gpu > 0:
@@ -426,7 +444,7 @@ class Cluster:
     def _kube_start(self, reset):
         cfg = self._cluster_config
         deploy = self.get_object(self.get_kube_info('deployments'), 'scanner-worker')
-        if deploy is not None and cfg.num_workers == 1:
+        if deploy is not None:
             num_workers = deploy['status']['replicas']
         else:
             num_workers = cfg.num_workers
@@ -455,14 +473,14 @@ class Cluster:
         deployments = self.get_kube_info('deployments')
         if self.get_object(deployments, 'scanner-master') is None:
             print('Creating deployments...')
-            self.create_object(self.make_deployment('master', 1))
+            self.create_object(self.make_deployment('master', self._cluster_config.master, 1))
 
         services = self.get_kube_info('services')
         if self.get_object(services, 'scanner-master') is None:
             run('kubectl expose deploy/scanner-master --type=NodePort --port=8080')
 
         if self.get_object(deployments, 'scanner-worker') is None:
-            self.create_object(self.make_deployment('worker', num_workers))
+            self.create_object(self.make_deployment('worker', self._cluster_config.worker, num_workers))
 
     def start(self, reset=True):
         self._cluster_start()
@@ -503,8 +521,8 @@ class Cluster:
 
         return '{}:{}'.format(ip, port)
 
-    def database(self):
-        return scannerpy.Database(master=self.master_address(), start_cluster=False)
+    def database(self, **kwargs):
+        return scannerpy.Database(master=self.master_address(), start_cluster=False, **kwargs)
 
     def job_status(self):
         db = self.database()
