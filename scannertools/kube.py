@@ -14,6 +14,8 @@ import base64
 import math
 import traceback
 from abc import ABC
+from threading import Thread, Condition
+from .prelude import log
 
 MASTER_POOL = 'default-pool'
 WORKER_POOL = 'workers'
@@ -27,7 +29,7 @@ def run(s, detach=False):
         return sp.check_output(s, shell=True).decode('utf-8').strip()
 
 
-@attrs
+@attrs(frozen=True)
 class CloudConfig:
     project = attrib(type=str)
     service_key = attrib(type=str)
@@ -61,7 +63,7 @@ class MachineType(ABC):
 GCP_MEM_RATIOS = {'standard': 3.75, 'highmem': 6.5, 'highcpu': 0.9}
 
 
-@attrs
+@attrs(frozen=True)
 class MachineTypeName(MachineType):
     name = attrib(type=str)
 
@@ -76,7 +78,7 @@ class MachineTypeName(MachineType):
         return self.name
 
 
-@attrs
+@attrs(frozen=True)
 class MachineTypeQuantity(MachineType):
     cpu = attrib(type=int)
     mem = attrib(type=int)
@@ -105,7 +107,7 @@ class MachineTypeQuantity(MachineType):
         return name
 
 
-@attrs
+@attrs(frozen=True)
 class MachineConfig:
     image = attrib(type=str)
     type = attrib(type=MachineType)
@@ -171,7 +173,7 @@ class MachineConfig:
         return p
 
 
-@attrs
+@attrs(frozen=True)
 class ClusterConfig:
     id = attrib(type=str)
     num_workers = attrib(type=int)
@@ -183,8 +185,8 @@ class ClusterConfig:
     autoscale = attrib(type=bool, default=False)
     no_workers_timeout = attrib(type=int, default=600)
     scopes = attrib(
-        type=list,
-        default=[
+        type=frozenset,
+        default=frozenset([
             "https://www.googleapis.com/auth/compute",
             "https://www.googleapis.com/auth/devstorage.read_write",
             "https://www.googleapis.com/auth/logging.write",
@@ -192,26 +194,36 @@ class ClusterConfig:
             "https://www.googleapis.com/auth/servicecontrol",
             "https://www.googleapis.com/auth/service.management.readonly",
             "https://www.googleapis.com/auth/trace.append"
-        ])
+        ]))
     scanner_config = attrib(
         type=str, default=os.path.join(os.environ['HOME'], '.scanner/config.toml'))
-    pipelines = attrib(type=list, default=[])
+    pipelines = attrib(type=frozenset, default=frozenset([]))
+
+    # unit is $/hr
+    def price(self):
+        return self.master.price() + self.worker.price() * self.num_workers
+
 
 
 class Cluster:
-    def __init__(self, cloud_config, cluster_config):
+    def __init__(self, cloud_config, cluster_config, no_start=False, no_delete=False):
         self._cloud_config = cloud_config
         self._cluster_config = cluster_config
         self._cluster_cmd = 'gcloud container --project {} clusters --zone {}' \
             .format(self._cloud_config.project, self._cluster_config.zone)
+        self._no_start = no_start
+        self._no_delete = no_delete
+
+    def config(self):
+        return self._cluster_config
 
     def get_kube_info(self, kind, namespace='default'):
         return json.loads(run('kubectl get {} -o json -n {}'.format(kind, namespace)))
 
     def get_by_owner(self, ty, owner, namespace='default'):
         return run(
-            'kubectl get {} -o json -n {} | jq \'.items[] | select(.metadata.ownerReferences[0].name == "{}") | .metadata.name\'' \
-            .format(ty, namespace, owner)[1:-1])
+            'kubectl get {} -o json -n {} | jq -r \'.items[] | select(.metadata.ownerReferences[0].name == "{}") | .metadata.name\'' \
+            .format(ty, namespace, owner))
 
     def get_object(self, info, name):
         for item in info['items']:
@@ -255,7 +267,7 @@ class Cluster:
             'name': name,
             'image': machine_config.image,
             'command': ['/bin/bash'],
-            'args': ['-c', 'python3 -c "from scannertools import kube; kube.{}()"'.format(name)],
+            'args': ['-c', 'pushd /opt/scanner && git fetch origin hwang-error-support && git checkout FETCH_HEAD && ./build.sh && popd && python3 -c "from scannertools import kube; kube.{}()"'.format(name)],
             'imagePullPolicy': 'Always',
             'volumeMounts': [{
                 'name': 'service-key',
@@ -285,7 +297,7 @@ class Cluster:
                 {'name': 'GLOG_logtostderr',
                  'value': '1'},
                 {'name': 'GLOG_v',
-                 'value': '1'},
+                 'value': '2' if name == 'master' else '1'},
                 {'name': 'WORKERS_PER_NODE',
                  'value': str(self._cluster_config.workers_per_node)},
                 {'name': 'PIPELINES',
@@ -384,15 +396,14 @@ class Cluster:
 
         if not self.running(pool=MASTER_POOL):
             try:
-                price = cfg.master.price() + cfg.worker.price() * cfg.num_workers
-                print('Cluster price: ${:.2f}/hr'.format(price))
+                log.info('Cluster price: ${:.2f}/hr'.format(cfg.price()))
             except Exception:
-                print('Failed to compute cluster price with error:')
+                log.info('Failed to compute cluster price with error:')
                 traceback.print_exc()
 
-            print('Creating master...')
+            log.info('Creating master...')
             run(cluster_cmd)
-            print(
+            log.info(
                 'https://console.cloud.google.com/kubernetes/clusters/details/{zone}/{cluster_id}?project={project}&tab=details' \
                 .format(zone=cfg.zone, project=self._cloud_config.project, **fmt_args))
 
@@ -411,11 +422,11 @@ class Cluster:
             {worker_cpu_platform}
             """.format(**fmt_args)
 
-            print('Creating workers...')
+            log.info('Creating workers...')
             run(pool_cmd)
 
             # Wait for cluster to enter reconciliation if it's going to occur
-            print('Waiting for cluster to reconcile...')
+            log.info('Waiting for cluster to reconcile...')
             if cfg.num_workers > 1:
                 time.sleep(60)
 
@@ -441,7 +452,7 @@ class Cluster:
             run('kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/stable/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
                 )
 
-    def _kube_start(self, reset):
+    def _kube_start(self, reset=True, wait=True):
         cfg = self._cluster_config
         deploy = self.get_object(self.get_kube_info('deployments'), 'scanner-worker')
         if deploy is not None:
@@ -450,14 +461,14 @@ class Cluster:
             num_workers = cfg.num_workers
 
         if reset:
-            print('Deleting current deployments...')
+            log.info('Deleting current deployments...')
             run('kubectl delete deploy/scanner-master deploy/scanner-worker --ignore-not-found=true'
                 )
             run('kubectl delete service/scanner-master --ignore-not-found=true')
 
         secrets = self.get_kube_info('secrets')
         if self.get_object(secrets, 'service-key') is None:
-            print('Making secrets...')
+            log.info('Making secrets...')
             run('kubectl create secret generic service-key --from-file={}' \
                 .format(self._cloud_config.service_key))
 
@@ -472,7 +483,7 @@ class Cluster:
 
         deployments = self.get_kube_info('deployments')
         if self.get_object(deployments, 'scanner-master') is None:
-            print('Creating deployments...')
+            log.info('Creating deployments...')
             self.create_object(self.make_deployment('master', self._cluster_config.master, 1))
 
         services = self.get_kube_info('services')
@@ -480,19 +491,30 @@ class Cluster:
             run('kubectl expose deploy/scanner-master --type=NodePort --port=8080')
 
         if self.get_object(deployments, 'scanner-worker') is None:
-            self.create_object(self.make_deployment('worker', self._cluster_config.worker, num_workers))
+            self.create_object(
+                self.make_deployment('worker', self._cluster_config.worker, num_workers))
 
-    def start(self, reset=True):
+        if wait:
+            log.info('Waiting on master...')
+            while True:
+                master = self.get_pod('scanner-master')
+                if master['status']['phase'] == 'Running':
+                    break
+                time.sleep(1.0)
+
+    def start(self, reset=True, wait=True):
         self._cluster_start()
 
         if self._cluster_config.id not in run(
                 'kubectl config view -o json | jq \'.["current-context"]\' -r'):
             self.get_credentials()
 
-        self._kube_start(reset)
+        self._kube_start(reset, wait)
+
+        log.info('Finished startup.')
 
     def resize(self, size):
-        print('Resizing cluster...')
+        log.info('Resizing cluster...')
         if not self._cluster_config.autoscale:
             run('{cmd} resize {id} -q --node-pool=workers --size={size}' \
                 .format(cmd=self._cluster_cmd, id=self._cluster_config.id, size=size))
@@ -500,11 +522,11 @@ class Cluster:
             run('{cmd} update {id} -q --node-pool=workers --enable-autoscaling --max-nodes={size}' \
                 .format(cmd=self._cluster_cmd, id=self._cluster_config.id, size=size))
 
-        print('Scaling deployment...')
+        log.info('Scaling deployment...')
         run('kubectl scale deploy/scanner-worker --replicas={}'.format(size))
 
-    def delete(self):
-        run('{cmd} delete {id}'.format(cmd=self._cluster_cmd, id=self._cluster_config.id))
+    def delete(self, prompt=False):
+        run('{cmd} {prompt} delete {id}'.format(cmd=self._cluster_cmd, prompt='-q' if not prompt else '', id=self._cluster_config.id))
 
     def master_address(self):
         ip = run('''
@@ -521,14 +543,89 @@ class Cluster:
 
         return '{}:{}'.format(ip, port)
 
-    def database(self, **kwargs):
-        return scannerpy.Database(master=self.master_address(), start_cluster=False, **kwargs)
+    def database(self, retries=3, **kwargs):
+        while True:
+            try:
+                return scannerpy.Database(master=self.master_address(), start_cluster=False, **kwargs)
+            except scannerpy.ScannerException:
+                if retries == 0:
+                    raise
+                else:
+                    retries -= 1
 
     def job_status(self):
         db = self.database()
         jobs = db.get_active_jobs()
         if len(jobs) > 0:
             db.wait_on_job(jobs[0])
+
+    def healthy(self):
+        failed = run('''
+            kubectl get pod -o json | \
+            jq -r '.items[].status | select(.phase == "Failed" or .containerStatuses[0].lastState.terminated.reason == "OOMKilled")'
+            ''')
+
+        return failed == ''
+
+    def monitor(self, db):
+        done = None
+        done_cvar = Condition()
+
+        def wrap(cond, val):
+            def wrapper():
+                nonlocal done
+                nonlocal done_cvar
+
+                while True:
+                    if done is not None:
+                        break
+
+                    if cond():
+                        with done_cvar:
+                            done = val
+                            done_cvar.notify()
+
+                    time.sleep(1.0)
+            return wrapper
+
+        jobs = db.get_active_jobs()
+        if len(jobs) == 0:
+            raise Exception("No active jobs")
+
+        gen = db.wait_on_job_gen(jobs[0])
+
+        def scanner_check():
+            nonlocal gen
+            try:
+                next(gen)
+                return False
+            except StopIteration:
+                return True
+
+        def health_check():
+            return not self.healthy()
+
+        checks = [(scanner_check, True), (health_check, False)]
+        threads = [Thread(target=wrap(f, v), daemon=True) for (f, v) in checks]
+        for t in threads:
+            t.start()
+
+        with done_cvar:
+            while done is None:
+                done_cvar.wait()
+
+        for t in threads:
+            t.join()
+
+        return done
+
+    def __enter__(self):
+        if not self._no_start:
+            self.start()
+
+    def __exit__(self, *args, **kwargs):
+        if not self._no_delete:
+            self.delete()
 
     def cli(self):
         parser = argparse.ArgumentParser()
@@ -537,9 +634,11 @@ class Cluster:
         create = command.add_parser('start')
         create.add_argument(
             '--no-reset', '-nr', action='store_true', help='Delete current deployments')
+        create.add_argument('--no-wait', '-nw', action='store_true', help='Don\'t wait for master')
         create.add_argument(
             '--num-workers', '-n', type=int, default=1, help='Initial number of workers')
-        command.add_parser('delete')
+        delete = command.add_parser('delete')
+        delete.add_argument('--no-prompt', '-np', action='store_true', help='Don\'t prompt for deletion')
         resize = command.add_parser('resize')
         resize.add_argument('size', type=int, help='Number of nodes')
         command.add_parser('get-credentials')
@@ -547,10 +646,10 @@ class Cluster:
 
         args = parser.parse_args()
         if args.command == 'start':
-            self.start(reset=not args.no_reset)
+            self.start(reset=not args.no_reset, wait=not args.no_wait)
 
         elif args.command == 'delete':
-            self.delete()
+            self.delete(prompt=not args.no_prompt)
 
         elif args.command == 'resize':
             self.resize(args.size)
@@ -562,8 +661,9 @@ class Cluster:
             self.job_status()
 
 
+
 def master():
-    print('Scannertools: starting master...')
+    log.info('Scannertools: starting master...')
     scannerpy.start_master(
         port='8080',
         block=True,
@@ -572,12 +672,12 @@ def master():
 
 
 def worker():
-    print('Scannertools: fetching resources...')
+    log.info('Scannertools: fetching resources...')
     pipelines = cloudpickle.loads(base64.b64decode(os.environ['PIPELINES']))
     for pipeline in pipelines:
         pipeline(None).fetch_resources()
 
-    print('Scannertools: starting worker...')
+    log.info('Scannertools: starting worker...')
     num_workers = int(os.environ['WORKERS_PER_NODE'])
     scannerpy.start_worker(
         '{}:{}'.format(os.environ['SCANNER_MASTER_SERVICE_HOST'],

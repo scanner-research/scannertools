@@ -22,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from tqdm import tqdm
 import multiprocessing as mp
 
+
 STORAGE = None
 LOCAL_STORAGE = None
 
@@ -223,10 +224,10 @@ class Pipeline(ABC):
 
     def _ingest(self, videos):
         videos = [v for v in videos if not self._db.has_table(v.scanner_name())]
+        batch = 100
         if len(videos) > 0:
-            # TODO(wcrichto): change this to inplace=True once
-            # https://github.com/scanner-research/scanner/issues/162 is fixed.
-            self._db.ingest_videos([(v.scanner_name(), v.path()) for v in videos])
+            for i in tqdm(range(0, len(videos), batch)):
+                self._db.ingest_videos([(v.scanner_name(), v.path()) for v in videos[i:i+batch]], inplace=True, force=True)
 
     def _build_jobs(self):
         source_keys = self._sources.keys()
@@ -297,7 +298,7 @@ class Pipeline(ABC):
     def build_pipeline(self):
         raise NotImplemented
 
-    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, no_execute=False, cpu_only=False):
+    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, no_execute=False, cpu_only=False, detach=False):
         self._cpu_only = cpu_only or not self._db.has_gpu()
 
         self.fetch_resources()
@@ -311,13 +312,16 @@ class Pipeline(ABC):
         jobs = self._build_jobs()
 
         if not no_execute:
-            self._db.run(self._sink.op, jobs, force=True, **{**self.run_opts, **run_opts})
+            self._db.run(self._sink.op, jobs, detach=detach, force=True, **{**self.run_opts, **run_opts})
+
+        if detach:
+            return
 
         return self.parse_output(**output_args)
 
     @classmethod
     def make_runner(cls):
-        def runner(db, run_opts={}, no_execute=False, cpu_only=False, **kwargs):
+        def runner(db, run_opts={}, detach=False, no_execute=False, cpu_only=False, **kwargs):
             pipeline = cls(db)
 
             def method_arg_names(f):
@@ -354,7 +358,8 @@ class Pipeline(ABC):
                 output_args=output_args,
                 run_opts=run_opts,
                 cpu_only=cpu_only,
-                no_execute=no_execute)
+                no_execute=no_execute,
+                detach=detach)
 
         return runner
 
