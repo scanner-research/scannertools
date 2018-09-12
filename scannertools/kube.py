@@ -16,6 +16,8 @@ import traceback
 from abc import ABC
 from threading import Thread, Condition
 from .prelude import log
+from scanner.metadata_pb2 import MachineParameters
+from scannerpy._python import default_machine_params
 
 MASTER_POOL = 'default-pool'
 WORKER_POOL = 'workers'
@@ -182,6 +184,8 @@ class ClusterConfig:
     zone = attrib(type=str, default='us-east1-b')
     kube_version = attrib(type=str, default='latest')
     workers_per_node = attrib(type=int, default=1)
+    num_load_workers = attrib(type=int, default=8)
+    num_save_workers = attrib(type=int, default=8)
     autoscale = attrib(type=bool, default=False)
     no_workers_timeout = attrib(type=int, default=600)
     scopes = attrib(
@@ -300,6 +304,10 @@ class Cluster:
                  'value': '2' if name == 'master' else '1'},
                 {'name': 'WORKERS_PER_NODE',
                  'value': str(self._cluster_config.workers_per_node)},
+                {'name': 'NUM_LOAD_WORKERS',
+                 'value': str(self._cluster_config.num_load_workers)},
+                {'name': 'NUM_SAVE_WORKERS',
+                 'value': str(self._cluster_config.num_save_workers)},
                 {'name': 'PIPELINES',
                  'value': base64.b64encode(cloudpickle.dumps(self._cluster_config.pipelines))},
                 # HACK(wcrichto): GPU decode for interlaced videos is broken, so forcing CPU
@@ -677,11 +685,17 @@ def worker():
     for pipeline in pipelines:
         pipeline(None).fetch_resources()
 
-    log.info('Scannertools: starting worker...')
+    machine_params = MachineParams()
+    machine_params.ParseFromString(default_machine_params())
+    machine_params.num_load_workers = int(os.environ['NUM_LOAD_WORKERS'])
+    machine_params.num_save_workers = int(os.environ['NUM_SAVE_WORKERS'])
     num_workers = int(os.environ['WORKERS_PER_NODE'])
+
+    log.info('Scannertools: starting worker...')
     scannerpy.start_worker(
         '{}:{}'.format(os.environ['SCANNER_MASTER_SERVICE_HOST'],
                        os.environ['SCANNER_MASTER_SERVICE_PORT']),
+        machine_params=machine_params.SerializeToString(),
         block=True,
         watchdog=False,
         port=5002,
