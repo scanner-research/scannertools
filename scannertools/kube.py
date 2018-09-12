@@ -271,7 +271,7 @@ class Cluster:
             'name': name,
             'image': machine_config.image,
             'command': ['/bin/bash'],
-            'args': ['-c', 'pushd /opt/scanner && git fetch origin hwang-error-support && git checkout FETCH_HEAD && ./build.sh && popd && python3 -c "from scannertools import kube; kube.{}()"'.format(name)],
+            'args': ['-c', 'python3 -c "from scannertools import kube; kube.{}()"'.format(name)],
             'imagePullPolicy': 'Always',
             'volumeMounts': [{
                 'name': 'service-key',
@@ -685,7 +685,7 @@ def worker():
     for pipeline in pipelines:
         pipeline(None).fetch_resources()
 
-    machine_params = MachineParams()
+    machine_params = MachineParameters()
     machine_params.ParseFromString(default_machine_params())
     machine_params.num_load_workers = int(os.environ['NUM_LOAD_WORKERS'])
     machine_params.num_save_workers = int(os.environ['NUM_SAVE_WORKERS'])
