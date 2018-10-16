@@ -112,7 +112,7 @@ def test_optical_flow(db, video):
 
 
 def test_shot_detection(db, video):
-    shot_detection.detect_shots(db, videos=[video], run_opts={'work_packet_size': 10})
+    shot_detection.detect_shots(db, videos=[video], run_opts={'work_packet_size': 10, 'io_packet_size': 100})
 
 
 @needs_gpu
