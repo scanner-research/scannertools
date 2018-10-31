@@ -31,7 +31,7 @@ def shot_boundaries(config, histograms: Sequence[bytes]) -> Sequence[bytes]:
 class ShotBoundaryPipeline(Pipeline):
     job_suffix = 'boundaries'
     base_sources = ['videos', 'histograms']
-    run_opts = {'io_packet_size': BOUNDARY_BATCH, 'work_packet_size': BOUNDARY_BATCH}
+    run_opts = {'io_packet_size': BOUNDARY_BATCH, 'work_packet_size': BOUNDARY_BATCH, 'pipeline_instances_per_node': 1}
 
     def build_pipeline(self):
         return {
@@ -43,10 +43,10 @@ class ShotBoundaryPipeline(Pipeline):
 
     def parse_output(self):
         boundaries = super().parse_output()
-        return [
-            pickle.loads(next(b._column.load(rows=[0])))
-            for b in boundaries
-        ]
+        def load(b):
+            return pickle.loads(next(b._column.load(rows=[0]))) \
+                if b is not None else None
+        return par_for(load, boundaries, workers=8)
 
 compute_shot_boundaries = ShotBoundaryPipeline.make_runner()
 
@@ -54,12 +54,13 @@ class HistogramPipeline(Pipeline):
     job_suffix = 'hist'
     parser_fn = lambda _: readers.histograms
 
-    def build_pipeline(self):
+    def build_pipeline(self, batch=1):
         return {
             'histogram':
             self._db.ops.Histogram(
-                frame=self._sources['frame_sampled'].op,
-                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU)
+                frame=self._sources['frame'].op,
+                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU,
+                batch=batch)
         }
 
 compute_histograms = HistogramPipeline.make_runner()

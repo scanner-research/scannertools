@@ -18,6 +18,8 @@ from threading import Thread, Condition
 from .prelude import log
 from scanner.metadata_pb2 import MachineParameters
 from scannerpy._python import default_machine_params
+import re
+from datetime import datetime
 
 MASTER_POOL = 'default-pool'
 WORKER_POOL = 'workers'
@@ -208,15 +210,15 @@ class ClusterConfig:
         return self.master.price() + self.worker.price() * self.num_workers
 
 
-
 class Cluster:
-    def __init__(self, cloud_config, cluster_config, no_start=False, no_delete=False):
+    def __init__(self, cloud_config, cluster_config, no_start=False, no_delete=False, containers=None):
         self._cloud_config = cloud_config
         self._cluster_config = cluster_config
         self._cluster_cmd = 'gcloud container --project {} clusters --zone {}' \
             .format(self._cloud_config.project, self._cluster_config.zone)
         self._no_start = no_start
         self._no_delete = no_delete
+        self._containers = containers or []
 
     def config(self):
         return self._cluster_config
@@ -345,7 +347,7 @@ class Cluster:
                 'template': {
                     'metadata': {'labels': {'app': 'scanner-{}'.format(name)}},
                     'spec': {  # PodSpec
-                        'containers': [self.make_container(name, machine_config)],
+                        'containers': [self.make_container(name, machine_config)] + self._containers,
                         'volumes': [{
                             'name': 'service-key',
                             'secret': {
@@ -431,7 +433,11 @@ class Cluster:
             """.format(**fmt_args)
 
             log.info('Creating workers...')
-            run(pool_cmd)
+            try:
+                run(pool_cmd)
+            except sp.CalledProcessError as e:
+                # Ignore errors for now due to GKE issue
+                log.error('Worker pool command errored: {}'.format(e))
 
             # Wait for cluster to enter reconciliation if it's going to occur
             log.info('Waiting for cluster to reconcile...')
@@ -534,7 +540,8 @@ class Cluster:
         run('kubectl scale deploy/scanner-worker --replicas={}'.format(size))
 
     def delete(self, prompt=False):
-        run('{cmd} {prompt} delete {id}'.format(cmd=self._cluster_cmd, prompt='-q' if not prompt else '', id=self._cluster_config.id))
+        run('{cmd} {prompt} delete {id}'.format(
+            cmd=self._cluster_cmd, prompt='-q' if not prompt else '', id=self._cluster_config.id))
 
     def master_address(self):
         ip = run('''
@@ -554,7 +561,8 @@ class Cluster:
     def database(self, retries=3, **kwargs):
         while True:
             try:
-                return scannerpy.Database(master=self.master_address(), start_cluster=False, **kwargs)
+                return scannerpy.Database(
+                    master=self.master_address(), start_cluster=False, **kwargs)
             except scannerpy.ScannerException:
                 if retries == 0:
                     raise
@@ -579,7 +587,7 @@ class Cluster:
         done = None
         done_cvar = Condition()
 
-        def wrap(cond, val):
+        def loop_set(cond, val):
             def wrapper():
                 nonlocal done
                 nonlocal done_cvar
@@ -594,6 +602,7 @@ class Cluster:
                             done_cvar.notify()
 
                     time.sleep(1.0)
+
             return wrapper
 
         jobs = db.get_active_jobs()
@@ -613,8 +622,16 @@ class Cluster:
         def health_check():
             return not self.healthy()
 
-        checks = [(scanner_check, True), (health_check, False)]
-        threads = [Thread(target=wrap(f, v), daemon=True) for (f, v) in checks]
+        metrics = []
+
+        def resource_check():
+            nonlocal metrics
+            metrics.extend([{'TIME': datetime.now(), **r} for r in self.resource_metrics()])
+            return False
+
+        checks = [(scanner_check, True), (health_check, False), (resource_check, None)]
+
+        threads = [Thread(target=loop_set(f, v), daemon=True) for (f, v) in checks]
         for t in threads:
             t.start()
 
@@ -625,11 +642,32 @@ class Cluster:
         for t in threads:
             t.join()
 
-        return done
+        return done, metrics
+
+    def resource_metrics(self):
+        table = run('kubectl top nodes').split('\n')
+        (header, rows) = (table[0], table[1:])
+
+        def match(line):
+            return re.findall(r'([^\s]+)\s*', line)
+
+        columns = match(header)
+        values = [{
+            c: int(re.search(r'(\d+)', v).group(1)) if c != 'NAME' else v
+            for (c, v) in zip(columns, match(row))
+        } for row in rows]
+        values = [v for v in values if 'default-pool' not in v['NAME']]
+
+        return values
+
+    def master_logs(self):
+        master = self.get_pod('scanner-master')
+        print(run('kubectl logs pod/{}'.format(master['metadata']['name'])))
 
     def __enter__(self):
         if not self._no_start:
             self.start()
+        return self
 
     def __exit__(self, *args, **kwargs):
         if not self._no_delete:
@@ -646,11 +684,13 @@ class Cluster:
         create.add_argument(
             '--num-workers', '-n', type=int, default=1, help='Initial number of workers')
         delete = command.add_parser('delete')
-        delete.add_argument('--no-prompt', '-np', action='store_true', help='Don\'t prompt for deletion')
+        delete.add_argument(
+            '--no-prompt', '-np', action='store_true', help='Don\'t prompt for deletion')
         resize = command.add_parser('resize')
         resize.add_argument('size', type=int, help='Number of nodes')
         command.add_parser('get-credentials')
         command.add_parser('job-status')
+        command.add_parser('master-logs')
 
         args = parser.parse_args()
         if args.command == 'start':
@@ -667,6 +707,9 @@ class Cluster:
 
         elif args.command == 'job-status':
             self.job_status()
+
+        elif args.command == 'master-logs':
+            self.master_logs()
 
 
 

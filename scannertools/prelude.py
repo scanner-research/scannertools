@@ -218,6 +218,7 @@ class Pipeline(ABC):
     base_sources = ['videos', 'frames']
     additional_sources = []
     run_opts = {}
+    custom_opts = []
 
     def __init__(self, db):
         self._db = db
@@ -229,20 +230,24 @@ class Pipeline(ABC):
             for i in tqdm(range(0, len(videos), batch)):
                 self._db.ingest_videos([(v.scanner_name(), v.path()) for v in videos[i:i+batch]], inplace=True, force=True)
 
-    def _build_jobs(self):
+    def _build_jobs(self, cache):
         source_keys = self._sources.keys()
 
-        jobs = []
-        for i in range(len(self._sink.args)):
+        def make_job(i):
+            if cache and self.committed(self._sink.args[i]):
+                return None
             map_ = {}
             for k in source_keys:
                 src = self._sources[k]
                 if src.args is not None:
                     map_[src.op] = src.args[i]
             map_[self._sink.op] = self._sink.args[i]
-            jobs.append(Job(op_args=map_))
+            return Job(op_args=map_)
+        jobs = par_for(make_job, list(range(len(self._sink.args))), workers=8, progress=False)
+        return [j for j in jobs if j is not None]
 
-        return jobs
+    def committed(self, output):
+        return self._db.has_table(output) and self._db.table(output).committed()
 
     def fetch_resources(self):
         pass
@@ -289,7 +294,7 @@ class Pipeline(ABC):
                 ScannerColumn(
                     self._db.table(t).column(col_name),
                     self.parser_fn() if self.parser_fn is not None else None)
-                if self._db.table(t).committed() else None
+                if self.committed(t) else None
                 for t in self._sink.args
             ]
         else:
@@ -298,7 +303,9 @@ class Pipeline(ABC):
     def build_pipeline(self):
         raise NotImplemented
 
-    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, no_execute=False, cpu_only=False, detach=False):
+    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, cpu_only=False, detach=False, megabatch=10000, cache=True):
+        self._custom_opts = custom_opts
+
         self._cpu_only = cpu_only or not self._db.has_gpu()
 
         self.fetch_resources()
@@ -309,10 +316,13 @@ class Pipeline(ABC):
 
         self._sink = self.build_sink(**sink_args)
 
-        jobs = self._build_jobs()
+        jobs = self._build_jobs(cache)
 
-        if not no_execute:
-            self._db.run(self._sink.op, jobs, detach=detach, force=True, **{**self.run_opts, **run_opts})
+        if not no_execute and len(jobs) > 0:
+            print('Executing {} jobs'.format(len(jobs)))
+            for i in range(0, len(jobs), megabatch):
+                print('Megabatch {}/{}'.format(int(i/megabatch+1), int(math.ceil(len(jobs) / float(megabatch)))))
+                self._db.run(self._sink.op, jobs[i:i+megabatch], detach=detach, force=True, **{**self.run_opts, **run_opts})
 
         if detach:
             return
@@ -321,7 +331,7 @@ class Pipeline(ABC):
 
     @classmethod
     def make_runner(cls):
-        def runner(db, run_opts={}, detach=False, no_execute=False, cpu_only=False, **kwargs):
+        def runner(db, run_opts={}, cache=True, detach=False, no_execute=False, cpu_only=False, megabatch=10000, **kwargs):
             pipeline = cls(db)
 
             def method_arg_names(f):
@@ -331,18 +341,21 @@ class Pipeline(ABC):
             pipeline_arg_names = method_arg_names(pipeline.build_pipeline)
             sink_arg_names = method_arg_names(pipeline.build_sink)
             output_arg_names = method_arg_names(pipeline.parse_output)
+            custom_opt_names = pipeline.custom_opts
 
             source_args = {}
             pipeline_args = {}
             sink_args = {}
             output_args = {}
+            custom_opts = {}
 
             for k, v in kwargs.items():
                 found = False
                 for (names, dct) in [(source_arg_names, source_args), \
                                      (pipeline_arg_names, pipeline_args), \
                                      (sink_arg_names, sink_args), \
-                                     (output_arg_names, output_args)]:
+                                     (output_arg_names, output_args), \
+                                     (custom_opt_names, custom_opts)]:
                     if k in names:
                         dct[k] = v
                         found = True
@@ -357,6 +370,7 @@ class Pipeline(ABC):
                 sink_args=sink_args,
                 output_args=output_args,
                 run_opts=run_opts,
+                custom_opts=custom_opts,
                 cpu_only=cpu_only,
                 no_execute=no_execute,
                 detach=detach)
