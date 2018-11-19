@@ -373,7 +373,8 @@ class Pipeline(ABC):
                 custom_opts=custom_opts,
                 cpu_only=cpu_only,
                 no_execute=no_execute,
-                detach=detach)
+                detach=detach,
+                cache=cache)
 
         return runner
 
