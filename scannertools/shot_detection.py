@@ -37,8 +37,7 @@ class ShotBoundaryPipeline(Pipeline):
         return {
             'boundaries':
             self._db.ops.ShotBoundaries(
-                histograms=self._sources['histograms'].op,
-                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU)
+                histograms=self._sources['histograms'].op)
         }
 
     def parse_output(self):
