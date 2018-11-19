@@ -62,7 +62,7 @@ class EmbedFaces(TensorFlowKernel):
 
                 outputs += embs[0].tobytes()
 
-        return ' ' if outputs == b'' else outputs
+        return b'\0' if outputs == b'' else outputs
 
 
 class FaceEmbeddingPipeline(Pipeline):
