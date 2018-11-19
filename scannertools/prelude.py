@@ -223,12 +223,14 @@ class Pipeline(ABC):
     def __init__(self, db):
         self._db = db
 
-    def _ingest(self, videos):
+    def _ingest(self, videos, batch=500):
         videos = [v for v in videos if not self._db.has_table(v.scanner_name())]
-        batch = 100
         if len(videos) > 0:
             for i in tqdm(range(0, len(videos), batch)):
-                self._db.ingest_videos([(v.scanner_name(), v.path()) for v in videos[i:i+batch]], inplace=True, force=True)
+                self._db.ingest_videos([
+                    (v.scanner_name(), v.path())
+                    for v in videos[i:i+batch]
+                ], inplace=True, force=True)
 
     def _build_jobs(self, cache):
         source_keys = self._sources.keys()
@@ -373,6 +375,7 @@ class Pipeline(ABC):
                 custom_opts=custom_opts,
                 cpu_only=cpu_only,
                 no_execute=no_execute,
+                megabatch=megabatch,
                 detach=detach,
                 cache=cache)
 
