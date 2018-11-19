@@ -14,7 +14,7 @@ class OpticalFlowPipeline(Pipeline):
     """
 
     job_suffix = 'flow'
-    parser_fn = lambda _: None
+    parser_fn = lambda _: lambda x: x
 
     def build_pipeline(self):
         return {
