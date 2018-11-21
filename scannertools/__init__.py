@@ -9,10 +9,7 @@ from . import face_detection
 from . import face_embedding
 from . import optical_flow
 from . import clothing_detection
-from . import brightness
-from . import contrast
-from . import sharpness
-from . import sharpness_bboxes
+from . import imgproc
 from . import tf_vis_utils
 from . import vis
 from . import bboxes
