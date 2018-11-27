@@ -84,5 +84,6 @@ You will need to download dependencies for different pipelines. Currently you ne
 * Face detection and face recognition: [facenet](https://github.com/davidsandberg/facenet)
 * Gender detection: [rude-carnie](https://github.com/dpressel/rude-carnie)
 * Clothing detection: `pip install torch==0.3.1 torchvision`
+* Face Landmark detection: `pip install torch==0.4.1` (note that pytorch version 0.4.1 has not been tested with clothing detection)
 
 See the [Dockerfile](https://github.com/scanner-research/scannertools/blob/master/Dockerfile) for how to set up the PYTHONPATH appropriately for these dependencies.
