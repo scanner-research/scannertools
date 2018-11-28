@@ -1,4 +1,4 @@
-from attr import attrs, attrib
+from attr import attrs, attrib, evolve
 import subprocess as sp
 import time
 import json
@@ -206,8 +206,8 @@ class ClusterConfig:
     pipelines = attrib(type=frozenset, default=frozenset([]))
 
     # unit is $/hr
-    def price(self):
-        return self.master.price() + self.worker.price() * self.num_workers
+    def price(self, no_master=False):
+        return (self.master.price() if not no_master else 0) + self.worker.price() * self.num_workers
 
 
 class Cluster:
@@ -528,6 +528,8 @@ class Cluster:
         log.info('Finished startup.')
 
     def resize(self, size):
+        log.info('Resized cluster price: ${:.2f}/hr'.format(evolve(self._cluster_config, num_workers=size).price()))
+
         log.info('Resizing cluster...')
         if not self._cluster_config.autoscale:
             run('{cmd} resize {id} -q --node-pool=workers --size={size}' \
@@ -662,7 +664,25 @@ class Cluster:
 
     def master_logs(self):
         master = self.get_pod('scanner-master')
-        print(run('kubectl logs pod/{}'.format(master['metadata']['name'])))
+        print(run('kubectl logs pod/{} master'.format(master['metadata']['name'])))
+
+    def worker_logs(self, n):
+        workers = [pod for pod in self.get_kube_info('pod')['items'] if pod['metadata']['labels']['app'] == 'scanner-worker']
+        print(run('kubectl logs pod/{} worker'.format(workers[n]['metadata']['name'])))
+
+    def latest_trace(self, path, subsample=None):
+        print('Writing trace...')
+        db = self.database()
+        job = max([
+            int(line.split('/')[-2])
+            for line in sp.check_output('gsutil ls gs://{}/{}/jobs'.format(
+                    db.config.config['storage']['bucket'],
+                    db.config.db_path),
+                shell=True) \
+            .decode('utf-8').split('\n')[:-1]
+        ])
+        db.profiler(job, subsample=subsample).write_trace(path)
+        print('Trace written.')
 
     def __enter__(self):
         if not self._no_start:
@@ -691,6 +711,11 @@ class Cluster:
         command.add_parser('get-credentials')
         command.add_parser('job-status')
         command.add_parser('master-logs')
+        worker_logs = command.add_parser('worker-logs')
+        worker_logs.add_argument('n', type=int, help='Index of worker')
+        latest_trace = command.add_parser('latest-trace')
+        latest_trace.add_argument('path')
+        latest_trace.add_argument('--subsample', type=int)
 
         args = parser.parse_args()
         if args.command == 'start':
@@ -711,6 +736,11 @@ class Cluster:
         elif args.command == 'master-logs':
             self.master_logs()
 
+        elif args.command == 'worker-logs':
+            self.worker_logs(args.n)
+
+        elif args.command == 'latest-trace':
+            self.latest_trace(args.path, subsample=args.subsample)
 
 
 def master():
