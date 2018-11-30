@@ -87,3 +87,24 @@ You will need to download dependencies for different pipelines. Currently you ne
 * Face Landmark detection: `pip install torch==0.4.1` (note that pytorch version 0.4.1 has not been tested with clothing detection)
 
 See the [Dockerfile](https://github.com/scanner-research/scannertools/blob/master/Dockerfile) for how to set up the PYTHONPATH appropriately for these dependencies.
+
+Some of the kernels have C++ versions for performance reasons (see [this folder](https://github.com/scanner-research/scannertools/tree/master/scannertools/cpp_ops)). If you want to use those, you'll have to use our prebuilt Docker images or compile these from scratch.
+
+First, find the installation location:
+
+```
+pip show scannertools
+```
+
+The installation location should be displayed under `Location`. Then, run:
+
+```
+cd INSTALLATION_LOCATION
+cd scannertools/cpp_ops
+mkdir -p build
+cd build
+cmake ..
+make
+```
+
+Now you should have access to the C++ kernels.
