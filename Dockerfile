@@ -24,5 +24,10 @@ RUN if [ "$tag2" != "cpu" ]; then \
     fi
 COPY . scannertools
 RUN cd scannertools && pip3 install --upgrade setuptools && python3 setup.py install
+RUN cd scannertools/scannertools/cpp_ops && \
+    mkdir -p build && \
+    cd build && \
+    cmake .. && \
+    make
 
 WORKDIR /app
