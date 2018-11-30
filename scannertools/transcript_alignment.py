@@ -36,7 +36,7 @@ def second2time(second, sep=','):
     return '{:02d}:{:02d}:{:02d}{:s}{:03d}'.format(h, m, s, sep, ms)
 
 def dump_aligned_transcript(align_word_list, path):
-    SRT_INTERVAL = 2
+    SRT_INTERVAL = 1
     outfile = open(path, 'w')
     start, end = None, None
     srt_idx = 1
@@ -136,14 +136,15 @@ class AlignTranscript(Kernel):
         if seg_idx == 0:
             audio_cat = np.concatenate((audio[1], audio[2][:audio_shift, ...]), 0)
         else:
-            audio_cat = np.concatenate((audio[0][:-audio_shift, ...], audio[1], audio[2][:audio_shift, ...]), 0)
+            audio_cat = np.concatenate((audio[0][-audio_shift:, ...], audio[1], audio[2][:audio_shift, ...]), 0)
+        print(audio_cat.shape)
         audio_path = tempfile.NamedTemporaryFile(suffix='.wav').name
         wavf.write(audio_path, ar, audio_cat)
         return audio_path    
 
     def align_segment(self, seg_idx, audio_path, transcript, punctuation):
         args = {'log': 'INFO',
-            'nthreads': 16,
+            'nthreads': 8,
             'conservative': True,
             'disfluency': True,
             }
@@ -164,11 +165,11 @@ class AlignTranscript(Kernel):
                 if word['case'] != 'not-found-in-transcript': 
                     if p == '>>' and (offset == word['startOffset'] - 3 or offset == word['startOffset'] - 4): 
                         word['word'] = '>> ' + word['word']
-                        start_idx += word_idx + 1
+                        start_idx += word_idx
                         break
                     if p != '>>' and offset == word['endOffset']:
                         word['word'] = word['word'] + p
-                        start_idx += word_idx + 1
+                        start_idx += word_idx
                         break
         
         # post-process
@@ -200,7 +201,7 @@ class AlignTranscript(Kernel):
                         end = word['start'] + seg_start
                         step = (end - start) / len(word_missing)
                         for i, w in enumerate(word_missing):
-                            align_word_list.append(('['+w+']', (start+i*step, start+(i+1)*step)))
+                            align_word_list.append((w, (start+i*step, start+(i+1)*step)))
                         word_missing = []
 
                     align_word_list.append((word['word'], (word['start'] + seg_start, word['end'] + seg_start)))
