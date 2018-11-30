@@ -87,9 +87,9 @@ class AlignTranscript(Kernel):
         """
         # Check file exist
         if not os.path.exists(transcript_path):
-            transcript_path = transcript_path.replace('cc5', 'cc1') 
-            if not os.path.exists(transcript_path):
-                raise Exception("Transcript file does not exist")
+#             transcript_path = transcript_path.replace('cc5', 'cc1') 
+#             if not os.path.exists(transcript_path):
+            raise Exception("Transcript file does not exist")
 
         # Check encoded in uft-8
         try:
@@ -137,7 +137,7 @@ class AlignTranscript(Kernel):
             audio_cat = np.concatenate((audio[1], audio[2][:audio_shift, ...]), 0)
         else:
             audio_cat = np.concatenate((audio[0][-audio_shift:, ...], audio[1], audio[2][:audio_shift, ...]), 0)
-        print(audio_cat.shape)
+#         print(audio_cat.shape)
         audio_path = tempfile.NamedTemporaryFile(suffix='.wav').name
         wavf.write(audio_path, ar, audio_cat)
         return audio_path    
@@ -219,7 +219,7 @@ class AlignTranscript(Kernel):
 #                 wavf.write(audio_path, 44100, aud)
 #         self.seg_idx += 1
 #         return pickle.dumps([])
-        print(self.seg_idx)
+#         print(self.seg_idx)
 
         transcript, punctuation = self.extract_transcript(self.seg_idx)
         audio_path = self.dump_audio(self.seg_idx, audio)
@@ -267,8 +267,8 @@ def align_transcript(db, audio, transcript, cache=False, align_dir=None):
         align_word_list = [word for seg in res.load() for word in seg]
         if not align_dir is None:
             filename = os.path.basename(transcript[idx])
-            cc = 'cc5' if 'cc5' in transcript[idx] else 'cc1'
-            output_path = os.path.join(align_dir, filename.replace(cc, 'word'))
+#             cc = 'cc5' if 'cc5' in transcript[idx] else 'cc1'
+            output_path = os.path.join(align_dir, filename + '.word.srt')
             dump_aligned_transcript_byword(align_word_list, output_path)
-            output_path = os.path.join(align_dir, filename.replace(cc, 'align'))
+            output_path = os.path.join(align_dir, filename + '.align.srt')
             dump_aligned_transcript(align_word_list, output_path)
