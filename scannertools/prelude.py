@@ -257,23 +257,24 @@ class Pipeline(ABC):
     def build_sources(self, videos=None, frames=None, **kwargs):
         sources = {}
 
-        self._ingest(videos)
+        if videos is not None:
+            self._ingest(videos)
 
-        frame = self._db.sources.FrameColumn()
-        sources['frame'] = BoundOp(
-            op=frame, args=[self._db.table(v.scanner_name()).column('frame') for v in videos])
+            frame = self._db.sources.FrameColumn()
+            sources['frame'] = BoundOp(
+                op=frame, args=[self._db.table(v.scanner_name()).column('frame') for v in videos])
 
-        if frames is not None:
-            if isinstance(frames, list):
-                frame_sampled = self._db.streams.Gather(frame)
-                sources['frame_sampled'] = BoundOp(op=frame_sampled, args=frames)
+            if frames is not None:
+                if isinstance(frames, list):
+                    frame_sampled = self._db.streams.Gather(frame)
+                    sources['frame_sampled'] = BoundOp(op=frame_sampled, args=frames)
+                else:
+                    frame_sampled = frames(frame)
+                    sources['frame_sampled'] = BoundOp(op=frame_sampled, args=None)
             else:
-                frame_sampled = frames(frame)
-                sources['frame_sampled'] = BoundOp(op=frame_sampled, args=None)
-        else:
-            frame_sampled = self._db.streams.Stride(frame)
-            sources['frame_sampled'] = BoundOp(
-                op=frame_sampled, args=[1 for _ in range(len(videos))])
+                frame_sampled = self._db.streams.Stride(frame)
+                sources['frame_sampled'] = BoundOp(
+                    op=frame_sampled, args=[1 for _ in range(len(videos))])
 
         for k, v in kwargs.items():
             source = v[0].scanner_source(self._db)
