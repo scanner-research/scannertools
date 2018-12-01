@@ -9,6 +9,7 @@ from . import face_embedding
 from . import optical_flow
 from . import clothing_detection
 from . import imgproc
+from . import histograms
 from . import face_landmark_detection
 from . import tf_vis_utils
 from . import vis

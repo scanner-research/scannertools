@@ -15,6 +15,39 @@ def brightness(config, frame: FrameType) -> bytes:
     brightness = np.mean(frame, axis=(0,1))[0]
     return pickle.dumps(brightness)
 
+@scannerpy.register_python_op(name='Contrast')
+def contrast(config, frame: FrameType) -> bytes:
+    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2YUV)
+
+    (h, w, c) = frame.shape
+    intensities = frame.reshape((h * w * c))[::3]
+
+    # Calculate the average intensity
+    average_intensity = np.mean(intensities)
+    contrast = np.sqrt(np.mean((intensities - average_intensity) ** 2))
+    return pickle.dumps(contrast)
+
+@scannerpy.register_python_op(name='Sharpness')
+def sharpness(config, frame: FrameType) -> bytes:
+    sharpness = cv2.Laplacian(frame, cv2.CV_64F).var()
+    return pickle.dumps(sharpness)
+
+@scannerpy.register_python_op(name='ConvertToHSV')
+def convert_to_hsv(config, frame: FrameType) -> FrameType:
+    return cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+
+@scannerpy.register_python_op(name='SharpnessBBox')
+def sharpness_bbox(config, frame: FrameType, bboxes:bytes) -> bytes:
+    bboxes = readers.bboxes(bboxes.self.config.protobufs)
+
+    results = []
+    for bbox in bboxes:
+        img = frame[int(bbox.y1):int(bbox.y2), int(bbox.x1):int(bbox.x2), :]
+        img = cv2.resize(img, (200, 200))
+        results.append(cv2.Laplacian(img, cv2.CV_64F).var())
+
+    return pickle.dumps(results)
+
 class BrightnessPipeline(Pipeline):
     job_suffix = 'brightness'
     parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
@@ -43,21 +76,6 @@ class BrightnessCPPPipeline(Pipeline):
             self._db.ops.BrightnessCPP(
                 frame=self._sources['frame_sampled'].op)
         }
-
-@scannerpy.register_python_op(name='Contrast')
-def contrast(config, frame: FrameType) -> bytes:
-    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2YUV)
-
-    (h, w, c) = frame.shape
-    intensities = frame.reshape((h * w * c))[::3]
-
-    # Calculate the average intensity
-    average_intensity = np.mean(intensities)
-    print(average_intensity)
-    print(np.mean(intensities - average_intensity))
-    print(np.mean((intensities - average_intensity) ** 2))
-    contrast = np.sqrt(np.mean((intensities - average_intensity) ** 2))
-    return pickle.dumps(contrast)
 
 class ContrastPipeline(Pipeline):
     job_suffix = 'contrast'
@@ -88,11 +106,6 @@ class ContrastCPPPipeline(Pipeline):
                 frame=self._sources['frame_sampled'].op)
         }
 
-@scannerpy.register_python_op(name='Sharpness')
-def sharpness(config, frame: FrameType) -> bytes:
-    sharpness = cv2.Laplacian(frame, cv2.CV_64F).var()
-    return pickle.dumps(sharpness)
-
 class SharpnessPipeline(Pipeline):
     job_suffix = 'sharpness'
     parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
@@ -120,18 +133,6 @@ class SharpnessCPPPipeline(Pipeline):
             self._db.ops.SharpnessCPP(
                 frame=self._sources['frame_sampled'].op)
         }
-
-@scannerpy.register_python_op(name='SharpnessBBox')
-def sharpness_bbox(config, frame: FrameType, bboxes:bytes) -> bytes:
-    bboxes = readers.bboxes(bboxes.self.config.protobufs)
-
-    results = []
-    for bbox in bboxes:
-        img = frame[int(bbox.y1):int(bbox.y2), int(bbox.x1):int(bbox.x2), :]
-        img = cv2.resize(img, (200, 200))
-        results.append(cv2.Laplacian(img, cv2.CV_64F).var())
-
-    return pickle.dumps(results)
 
 class SharpnessBBoxPipeline(Pipeline):
     job_suffix = 'sharpness_bbox'
