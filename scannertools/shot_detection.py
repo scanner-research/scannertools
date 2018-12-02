@@ -1,4 +1,5 @@
 from .prelude import *
+from .histograms import compute_histograms
 from scipy.spatial import distance
 import numpy as np
 from typing import Sequence
@@ -48,21 +49,6 @@ class ShotBoundaryPipeline(Pipeline):
         return par_for(load, boundaries, workers=8)
 
 compute_shot_boundaries = ShotBoundaryPipeline.make_runner()
-
-class HistogramPipeline(Pipeline):
-    job_suffix = 'hist'
-    parser_fn = lambda _: readers.histograms
-
-    def build_pipeline(self, batch=1):
-        return {
-            'histogram':
-            self._db.ops.Histogram(
-                frame=self._sources['frame'].op,
-                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU,
-                batch=batch)
-        }
-
-compute_histograms = HistogramPipeline.make_runner()
 
 def detect_shots(db, videos, **kwargs):
     hists = compute_histograms(db, videos=videos, **kwargs)
