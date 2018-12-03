@@ -283,6 +283,7 @@ class TranscriptAligner():
             self.dump_aligned_transcript_byword(align_word_list, output_path)
             output_path = os.path.join(self.align_dir, self.video_name + '.align.srt')
             self.dump_aligned_transcript(align_word_list, output_path)
+        return {'word_missing': 1. * num_word_missing / len(align_word_list)}
         
 
 @scannerpy.register_python_op(unbounded_state=True, stencil=[-1,0,1])
