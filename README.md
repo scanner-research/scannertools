@@ -56,7 +56,7 @@ Scannertools requires the Python packages for our three libraries [Scanner](http
 We recommend using our prebuilt Docker images for Scannertools ([`scannerresearch/scannertools`](https://hub.docker.com/r/scannerresearch/scanner/)). For example:
 
 ```
-will@scannertools ~ ❯❯❯ docker run -ti scannerresearch/scannertools:cpu-latest bash
+will@scannertools ~ ❯❯❯ docker run -v $(pwd):/app -ti scannerresearch/scannertools:cpu-latest bash
 root@7aec5a7d9198:/app# python3 /opt/scannertools/examples/face_detection.py
 ...
 Wrote video with objects drawn to /app/sample_faces.mp4
@@ -68,7 +68,7 @@ sample_faces.mp4
 If you want to use our GPU images, then you need to install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker#quickstart). Then run Docker with the `--runtime nvidia` flag, e.g.
 
 ```
-will@scannertools ~ ❯❯❯ docker run --runtime nvidia \
+will@scannertools ~ ❯❯❯ docker run --runtime nvidia -v $(pwd):/app \
     -ti scannerresearch/scannertools:gpu-9.0-cudnn7-latest bash
 ```
 
