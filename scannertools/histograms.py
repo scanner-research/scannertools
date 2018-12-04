@@ -46,7 +46,6 @@ class OpticalFlowHistogramPipeline(Pipeline):
     """
     job_suffix = 'flow_hist'
     parser_fn = lambda _: flow_hist_reader
-    run_opts = { 'pipeline_instances_per_node': 1 }
 
     def fetch_resources(self):
         cwd = os.path.dirname(os.path.abspath(__file__))
