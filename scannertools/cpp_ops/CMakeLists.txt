@@ -13,7 +13,7 @@ include(${SCANNER_CMAKE_PATH})
 # points to a Protobuf file and will generate the C++ and Python bindings.
 build_op(
   LIB_NAME imgproc_op
-  CPP_SRCS imgproc.cpp
+  CPP_SRCS imgproc.cpp flow_histogram_kernel_cpu.cpp 
   PROTO_SRC imgproc.proto)
 
 # The library specified in build_op is a normal CMake target, so you can use all

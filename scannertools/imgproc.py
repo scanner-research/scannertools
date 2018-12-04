@@ -64,13 +64,14 @@ class BrightnessCPPPipeline(Pipeline):
     job_suffix = 'brightness_cpp'
     parser_fn = lambda _: lambda buf, _: struct.unpack('f', buf)[0]
 
-    def build_pipeline(self):
+    def fetch_resources(self):
         cwd = os.path.dirname(os.path.abspath(__file__))
 
         self._db.load_op(
             os.path.join(cwd, 'cpp_ops/build/libimgproc_op.so'),
             os.path.join(cwd, 'cpp_ops/build/imgproc_pb2.py'))
 
+    def build_pipeline(self):
         return {
             'brightness':
             self._db.ops.BrightnessCPP(
@@ -93,13 +94,14 @@ class ContrastCPPPipeline(Pipeline):
     job_suffix = 'contrast_cpp'
     parser_fn = lambda _: lambda buf, _: struct.unpack('f', buf)[0]
 
-    def build_pipeline(self):
+    def fetch_resources(self):
         cwd = os.path.dirname(os.path.abspath(__file__))
 
         self._db.load_op(
             os.path.join(cwd, 'cpp_ops/build/libimgproc_op.so'),
             os.path.join(cwd, 'cpp_ops/build/imgproc_pb2.py'))
 
+    def build_pipeline(self):
         return {
             'contrast':
             self._db.ops.ContrastCPP(
@@ -121,13 +123,14 @@ class SharpnessCPPPipeline(Pipeline):
     job_suffix = 'sharpness_cpp'
     parser_fn = lambda _: lambda buf, _: struct.unpack('f', buf)[0]
 
-    def build_pipeline(self):
+    def fetch_resources(self):
         cwd = os.path.dirname(os.path.abspath(__file__))
 
         self._db.load_op(
             os.path.join(cwd, 'cpp_ops/build/libimgproc_op.so'),
             os.path.join(cwd, 'cpp_ops/build/imgproc_pb2.py'))
 
+    def build_pipeline(self):
         return {
             'sharpness':
             self._db.ops.SharpnessCPP(
@@ -152,13 +155,14 @@ class SharpnessBBoxCPPPipeline(Pipeline):
     parser_fn = lambda _: lambda buf, _: struct.unpack(
             '{}f'.format(int(len(buf) / 4)), buf)
 
-    def build_pipeline(self):
+    def fetch_resources(self):
         cwd = os.path.dirname(os.path.abspath(__file__))
 
         self._db.load_op(
             os.path.join(cwd, 'cpp_ops/build/libimgproc_op.so'),
             os.path.join(cwd, 'cpp_ops/build/imgproc_pb2.py'))
 
+    def build_pipeline(self):
         return {
             'sharpness_bbox':
             self._db.ops.SharpnessBBoxCPP(
