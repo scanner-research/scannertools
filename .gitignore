@@ -7,3 +7,4 @@ doc/source/
 build
 dist
 *.egg-info
+*.swp
