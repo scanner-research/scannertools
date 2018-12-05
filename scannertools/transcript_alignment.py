@@ -16,6 +16,7 @@ import re
 import tempfile
 import scipy.io.wavfile as wavf
 import multiprocessing
+import json
 
 if not '/app/gentle' in sys.path:
     sys.path.append('/app/gentle')
@@ -56,14 +57,14 @@ class TranscriptAligner():
         if not self.media_path is None:
             _, ext = os.path.splitext(self.media_path)
             self.video_name = os.path.basename(self.media_path)
-        if ext == '.mp4':
-            cap = cv2.VideoCapture(self.media_path)
-            self.video_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.fps = cap.get(cv2.CAP_PROP_FPS)
-            self.video_length = int(self.video_frames // self.fps)
-            self.num_seg = int(self.video_length // self.seg_length)
-        elif ext == '.wav':
-            raise Exception("Not implemented error")
+            if ext == '.mp4':
+                cap = cv2.VideoCapture(self.media_path)
+                self.video_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                self.fps = cap.get(cv2.CAP_PROP_FPS)
+                self.video_length = int(self.video_frames // self.fps)
+                self.num_seg = int(self.video_length // self.seg_length)
+            elif ext == '.wav':
+                raise Exception("Not implemented error")
     
     def load_transcript(self, transcript_path):
         """"
@@ -112,17 +113,6 @@ class TranscriptAligner():
                 transcript_seg += text + ' ' 
         punctuation_seg.sort()
         return transcript_seg, punctuation_seg
-
-    def dump_audio_segment(self, seg_idx, audio):
-        ar = audio[0].shape[0] // self.seg_length
-        audio_shift = ar * self.audio_shift
-        if seg_idx == 0:
-            audio_cat = np.concatenate((audio[1], audio[2][:audio_shift, ...]), 0)
-        else:
-            audio_cat = np.concatenate((audio[0][-audio_shift:, ...], audio[1], audio[2][:audio_shift, ...]), 0)
-        audio_path = tempfile.NamedTemporaryFile(suffix='.wav').name
-        wavf.write(audio_path, ar, audio_cat)
-        return audio_path    
     
     def extract_transcript_all(self):
         self.text_seg_list = []
@@ -132,7 +122,7 @@ class TranscriptAligner():
             self.text_seg_list.append(transcript_seg)
             self.punc_seg_list.append(punctuation_seg)
     
-    def extract_audio_segment(self, seg_idx):
+    def extract_audio_segment(self, seg_idx): 
         start = seg_idx * self.seg_length
         start = start - self.audio_shift if seg_idx > 0 else start
         duration = self.seg_length 
@@ -216,8 +206,75 @@ class TranscriptAligner():
 
                     align_word_list.append((word['word'], (word['start'] + seg_start, word['end'] + seg_start)))
         return {'align_word_list': align_word_list, 'num_word_missing': num_word_missing}    
-
-    def dump_aligned_transcript(self, align_word_list, path):
+        
+    def run_all(self):
+        self.load_transcript(self.transcript_path)
+        self.extract_transcript_all()
+        print("Extracting transcripts done")
+        self.extract_audio_all()
+        print("Extracting audio done")
+        pool = multiprocessing.Pool(self.num_thread)
+        self.result_all = pool.map(self.align_segment_thread, [i for i in range(self.num_seg)])
+    
+        align_word_list = []
+        num_word_missing = 0
+        for seg in self.result_all:
+            align_word_list += [word for word in seg['align_word_list']]
+            num_word_missing += seg['num_word_missing']
+        print('word_missing', 1. * num_word_missing / len(align_word_list))
+        if not self.align_dir is None:
+            output_path = os.path.join(self.align_dir, self.video_name + '.word.srt')
+            TranscriptAligner.dump_aligned_transcript_byword(align_word_list, output_path)
+            output_path = os.path.join(self.align_dir, self.video_name + '.align.srt')
+            TranscriptAligner.dump_aligned_transcript(align_word_list, output_path)
+        return {'word_missing': 1. * num_word_missing / len(align_word_list)}    
+        
+    def run_segment_scanner(self, audio, caption):
+        if len(caption[1]) == 0:
+            return {'align_word_list': [], 'num_word_missing': 0}
+        else:
+            seg_idx = int(caption[1][0]['end'] // self.seg_length)
+#         print(seg_idx, "==========")
+#         print(caption[0][:3], caption[1][:3])
+        
+        audio_path = self.dump_audio_scanner(seg_idx, audio)
+        transcript, punctuation = self.extract_transcript_scanner(seg_idx, caption)
+        result_seg = self.align_segment(seg_idx, audio_path, transcript, punctuation)
+        return result_seg
+   
+    def extract_transcript_scanner(self, seg_idx, caption):
+        start = seg_idx * self.seg_length - self.text_shift
+        end = (seg_idx + 1) * self.seg_length + self.text_shift
+        punctuation_seg = []
+        transcript_seg = ''
+        captions = caption[0] + caption[1] + caption[2]
+        for cap in captions:
+            text, ss, ee = cap['line'], cap['start'], cap['end']
+            if ss > end:
+                break
+            if ss >= start:
+                offset = len(transcript_seg)
+                for p in self.punctuation_all:
+                    pp = p.replace('[', '').replace(']', '')
+                    for match in re.finditer(p, text):
+                        punctuation_seg.append((match.start()+offset, pp))
+                transcript_seg += text + ' ' 
+        punctuation_seg.sort()
+        return transcript_seg, punctuation_seg
+    
+    def dump_audio_scanner(self, seg_idx, audio):
+        ar = audio[1].shape[0] // self.seg_length
+        audio_shift = ar * self.audio_shift
+        if seg_idx == 0:
+            audio_cat = np.concatenate((audio[1], audio[2][:audio_shift, ...]), 0)
+        else:
+            audio_cat = np.concatenate((audio[0][-audio_shift:, ...], audio[1], audio[2][:audio_shift, ...]), 0)
+        audio_path = tempfile.NamedTemporaryFile(suffix='.wav').name
+        wavf.write(audio_path, ar, audio_cat)
+        return audio_path    
+    
+    @staticmethod
+    def dump_aligned_transcript(align_word_list, path):
         SRT_INTERVAL = 1
         outfile = open(path, 'w')
         start, end = None, None
@@ -243,8 +300,9 @@ class TranscriptAligner():
         line += text + '\n\n'
         outfile.write(line)
         outfile.close()
-
-    def dump_aligned_transcript_byword(self, align_word_list, path):
+    
+    @staticmethod
+    def dump_aligned_transcript_byword(align_word_list, path):
         outfile = open(path, 'w')
         srt_idx = 1
         for idx, word in enumerate(align_word_list):
@@ -254,39 +312,10 @@ class TranscriptAligner():
             line += word[0] + '\n\n'
             outfile.write(line)
             srt_idx += 1
-        outfile.close()   
-   
-    def run_sequential(self, audio):
-        transcript, punctuation = self.extract_transcript(self.seg_idx)
-        audio_path = self.dump_audio(self.seg_idx, audio)
-        result_seg = self.align_segment(self.seg_idx, audio_path, transcript, punctuation)
-        self.seg_idx += 1
-        return result_seg
-    
-    def run_all(self):
-        self.load_transcript(self.transcript_path)
-        self.extract_transcript_all()
-        print("Extracting transcripts done")
-        self.extract_audio_all()
-        print("Extracting audio done")
-        pool = multiprocessing.Pool(self.num_thread)
-        self.result_all = pool.map(self.align_segment_thread, [i for i in range(self.num_seg)])
-    
-        align_word_list = []
-        num_word_missing = 0
-        for seg in self.result_all:
-            align_word_list += [word for word in seg['align_word_list']]
-            num_word_missing += seg['num_word_missing']
-        print('word_missing', 1. * num_word_missing / len(align_word_list))
-        if not self.align_dir is None:
-            output_path = os.path.join(self.align_dir, self.video_name + '.word.srt')
-            self.dump_aligned_transcript_byword(align_word_list, output_path)
-            output_path = os.path.join(self.align_dir, self.video_name + '.align.srt')
-            self.dump_aligned_transcript(align_word_list, output_path)
-        return {'word_missing': 1. * num_word_missing / len(align_word_list)}
+        outfile.close()  
         
 
-@scannerpy.register_python_op(unbounded_state=True, stencil=[-1,0,1])
+@scannerpy.register_python_op(name='AlignTranscript', stencil=[-1,0,1])
 class AlignTranscript(Kernel):
     def __init__(self, config):
         seg_length = config.args.get('seg_length', 60)
@@ -295,42 +324,38 @@ class AlignTranscript(Kernel):
         self.aligner = TranscriptAligner(seg_length, text_shift, num_thread)
     
     def new_stream(self, args):
-        self.aligner.load_transcript(args['transcript_path'])
+#         self.aligner.load_transcript(args['transcript_path'])
+        pass 
         
-    def execute(self, audio: Sequence[FrameType]) -> bytes:
-#         for idx, aud in enumerate(audio):
-#             print(self.seg_idx, idx, aud.shape)
-#             if self.seg_idx == 59:
-#                 audio_path = '../app/data/seg_{:}.wav'.format(idx)
-#                 wavf.write(audio_path, 44100, aud)
-#         self.seg_idx += 1
-#         return pickle.dumps([])
-        
-        result_seg = self.aligner.run_sequential(audio)
+    def execute(self, audio: Sequence[FrameType], captions: Sequence[bytes]) -> bytes:
+        cap_json = [json.loads(cap.decode('utf-8')) for cap in captions]
+        result_seg = self.aligner.run_segment_scanner(audio, cap_json)
         return pickle.dumps(result_seg)
 
 
 class AlignTranscriptPipeline(Pipeline):
     job_suffix = 'align_transcript'
-    base_sources = ['audio']
-    run_opts = {'pipeline_instances_per_node': 16}
-    custom_opts = ['transcript']
+    base_sources = ['audio', 'captions']
+    run_opts = {'pipeline_instances_per_node': 1, 'io_packet_size': 4, 'work_packet_size': 4}
+#     custom_opts = ['video_length']
     parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
 
     def build_pipeline(self):
         return {
             'align_transcript':
             self._db.ops.AlignTranscript(
-                audio=self._sources['audio'].op, 
+                audio=self._sources['audio'].op,
+                captions=self._sources['captions'].op,
                 seg_length = 60,
                 max_misalign = 10,
+                num_thread = 1
                 )
         }
 
     def _build_jobs(self, cache):
         jobs = super(AlignTranscriptPipeline, self)._build_jobs(cache)
-        for (job, transcript) in zip(jobs, self._custom_opts['transcript']):
-            job._op_args[self._output_ops['align_transcript']] = {'transcript_path': transcript}
+#         for (job, video_length) in zip(jobs, self._custom_opts['video_length']):
+#             job._op_args[self._output_ops['align_transcript']] = {'video_length': video_length}
         return jobs
 
     def build_sink(self):
@@ -343,11 +368,11 @@ class AlignTranscriptPipeline(Pipeline):
 
 align_transcript_pipeline = AlignTranscriptPipeline.make_runner()
 
-def align_transcript(db, audio, transcript, cache=False, align_dir=None, res_path=None):
-    result = align_transcript_pipeline(db=db, audio=audio, transcript=transcript, cache=cache)
+def align_transcript(db, video_list, audio, caption, cache=False, align_dir=None, res_path=None):
+    result = align_transcript_pipeline(db=db, audio=audio, captions=caption, cache=cache)
     res_stats = {}
     for idx, res_video in enumerate(result):
-        video_name = os.path.basename(transcript[idx])
+        video_name = video_list[idx]
         align_word_list = []
         num_word_missing = 0
         for seg in res_video.load():
@@ -356,9 +381,9 @@ def align_transcript(db, audio, transcript, cache=False, align_dir=None, res_pat
         res_stats[video_name] = {'word_missing': 1. * num_word_missing / len(align_word_list)}
         if not align_dir is None:
             output_path = os.path.join(align_dir, video_name + '.word.srt')
-            dump_aligned_transcript_byword(align_word_list, output_path)
+            TranscriptAligner.dump_aligned_transcript_byword(align_word_list, output_path)
             output_path = os.path.join(align_dir, video_name + '.align.srt')
-            dump_aligned_transcript(align_word_list, output_path)
+            TranscriptAligner.dump_aligned_transcript(align_word_list, output_path)
     if not res_path is None:
         pickle.dump(res_stats, open(res_path, 'wb'))
     return result
