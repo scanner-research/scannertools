@@ -39,6 +39,7 @@ def try_import(to_import, current_module):
 
 log = logging.getLogger('scannertools')
 log.setLevel(logging.DEBUG)
+log.propagate = False
 if not log.handlers:
 
     class CustomFormatter(logging.Formatter):
