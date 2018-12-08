@@ -185,7 +185,6 @@ class ClusterConfig:
     worker = attrib(type=MachineConfig)
     zone = attrib(type=str, default='us-east1-b')
     kube_version = attrib(type=str, default='latest')
-    workers_per_node = attrib(type=int, default=1)
     num_load_workers = attrib(type=int, default=8)
     num_save_workers = attrib(type=int, default=8)
     autoscale = attrib(type=bool, default=False)
@@ -304,8 +303,6 @@ class Cluster:
                  'value': '1'},
                 {'name': 'GLOG_v',
                  'value': '2' if name == 'master' else '1'},
-                {'name': 'WORKERS_PER_NODE',
-                 'value': str(self._cluster_config.workers_per_node)},
                 {'name': 'NUM_LOAD_WORKERS',
                  'value': str(self._cluster_config.num_load_workers)},
                 {'name': 'NUM_SAVE_WORKERS',
@@ -764,7 +761,6 @@ def worker():
     machine_params.ParseFromString(default_machine_params())
     machine_params.num_load_workers = int(os.environ['NUM_LOAD_WORKERS'])
     machine_params.num_save_workers = int(os.environ['NUM_SAVE_WORKERS'])
-    num_workers = int(os.environ['WORKERS_PER_NODE'])
 
     log.info('Scannertools: starting worker...')
     scannerpy.start_worker(
@@ -773,5 +769,4 @@ def worker():
         machine_params=machine_params.SerializeToString(),
         block=True,
         watchdog=False,
-        port=5002,
-        num_workers=num_workers if num_workers > 1 else None)
+        port=5002)
