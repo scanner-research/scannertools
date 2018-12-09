@@ -492,7 +492,7 @@ class AlignTranscriptPipeline(Pipeline):
     job_suffix = 'align_transcript'
     base_sources = ['audio', 'captions']
     run_opts = {'pipeline_instances_per_node': 8, 'io_packet_size': 4, 'work_packet_size': 4, 'checkpoint_frequency': 20}
-#     custom_opts = ['video_name']
+    custom_opts = ['seg_length', 'max_misalign', 'num_thread', 'exhausted']
 #     parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
     parser_fn = lambda _: parse
 
@@ -502,10 +502,10 @@ class AlignTranscriptPipeline(Pipeline):
             self._db.ops.AlignTranscript(
                 audio=self._sources['audio'].op,
                 captions=self._sources['captions'].op,
-                seg_length = 60,
-                max_misalign = 10,
-                num_thread = 1,
-                exhausted = False
+                seg_length=self._custom_opts['seg_length'],
+                max_misalign=self._custom_opts['max_misalign'],
+                num_thread=self._custom_opts['num_thread'],
+                exhausted=self._custom_opts['exhausted']
                 )
         }
 
