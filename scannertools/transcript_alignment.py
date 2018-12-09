@@ -491,7 +491,7 @@ def parse(buf, config):
 class AlignTranscriptPipeline(Pipeline):
     job_suffix = 'align_transcript'
     base_sources = ['audio', 'captions']
-    run_opts = {'pipeline_instances_per_node': 1, 'io_packet_size': 4, 'work_packet_size': 4, 'checkpoint_frequency': 20}
+    run_opts = {'pipeline_instances_per_node': 8, 'io_packet_size': 4, 'work_packet_size': 4, 'checkpoint_frequency': 20}
 #     custom_opts = ['video_name']
 #     parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
     parser_fn = lambda _: parse
