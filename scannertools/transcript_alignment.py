@@ -491,8 +491,8 @@ def parse(buf, config):
 class AlignTranscriptPipeline(Pipeline):
     job_suffix = 'align_transcript'
     base_sources = ['audio', 'captions']
-    run_opts = {'pipeline_instances_per_node': 1, 'io_packet_size': 4, 'work_packet_size': 4, 'checkpoint_frequency': 25}
-    custom_opts = ['video_name']
+    run_opts = {'pipeline_instances_per_node': 1, 'io_packet_size': 4, 'work_packet_size': 4, 'checkpoint_frequency': 20}
+#     custom_opts = ['video_name']
 #     parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
     parser_fn = lambda _: parse
 
@@ -511,8 +511,8 @@ class AlignTranscriptPipeline(Pipeline):
 
     def _build_jobs(self, cache):
         jobs = super(AlignTranscriptPipeline, self)._build_jobs(cache)
-        for (job, video_name) in zip(jobs, self._custom_opts['video_name']):
-            job._op_args[self._output_ops['align_transcript']] = {'video_name': video_name}
+#         for (job, video_name) in zip(jobs, self._custom_opts['video_name']):
+#             job._op_args[self._output_ops['align_transcript']] = {'video_name': video_name}
         return jobs
 
     def build_sink(self):
@@ -526,7 +526,10 @@ class AlignTranscriptPipeline(Pipeline):
 align_transcript_pipeline = AlignTranscriptPipeline.make_runner()
 
 def align_transcript(db, video_list, audio, caption, cache=False, align_dir=None, res_path=None):
-    result = align_transcript_pipeline(db=db, audio=audio, captions=caption, video_name=video_list, cache=cache)
+    result = align_transcript_pipeline(db=db, audio=audio, captions=caption, cache=cache)
+    if align_dir is None or res_path is None:
+        return 
+
     if not res_path is None and os.path.exists(res_path):
         res_stats = pickle.load(open(res_path, 'rb'))
     else:
@@ -549,12 +552,11 @@ def align_transcript(db, video_list, audio, caption, cache=False, align_dir=None
 #             print(seg_idx, seg['num_word_aligned'])
         res_stats[video_name] = {'word_missing': 1 - 1. * num_word_aligned / num_word_total}
         print('word_missing', 1 - 1. * num_word_aligned / num_word_total)
-        print('word_missing', 1 - 1. * num_word_aligned / len(align_word_list))
+#         print('word_missing', 1 - 1. * num_word_aligned / len(align_word_list))
         if not align_dir is None:
             output_path = os.path.join(align_dir, video_name + '.word.srt')
             TranscriptAligner.dump_aligned_transcript_byword(align_word_list, output_path)
             output_path = os.path.join(align_dir, video_name + '.align.srt')
             TranscriptAligner.dump_aligned_transcript(align_word_list, output_path)
-    if not res_path is None:
-        pickle.dump(res_stats, open(res_path, 'wb'))
-    return result
+        if not res_path is None:
+            pickle.dump(res_stats, open(res_path, 'wb'))
