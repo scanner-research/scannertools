@@ -1,5 +1,5 @@
 .cache
-__pycache__
+**/__pycache__
 .gdb_history
 *.pyc
 doc/_build

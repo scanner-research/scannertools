@@ -308,6 +308,7 @@ class Pipeline(ABC):
         raise NotImplemented
 
     def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, cpu_only=False, detach=False, megabatch=10000, cache=True):
+        self._custom_run_opts = run_opts
         self._custom_opts = custom_opts
 
         self._cpu_only = cpu_only or not self._db.has_gpu()
@@ -326,7 +327,7 @@ class Pipeline(ABC):
             print('Executing {} jobs'.format(len(jobs)))
             for i in range(0, len(jobs), megabatch):
                 print('Megabatch {}/{}'.format(int(i/megabatch+1), int(math.ceil(len(jobs) / float(megabatch)))))
-                self._db.run(self._sink.op, jobs[i:i+megabatch], detach=detach, force=True, **{**self.run_opts, **run_opts})
+                self._db.run(self._sink.op, jobs[i:i+megabatch], detach=detach, force=True, **{**self.run_opts, **self._custom_run_opts})
 
         if detach:
             return
