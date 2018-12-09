@@ -9,14 +9,17 @@ import toml
 import shutil
 
 # TODO: test output on all the pipelines
+if __name__ == "__main__":
+    try:
+        sp.check_call(['nvidia-smi'])
+        has_gpu = True
+    except (OSError, sp.CalledProcessError):
+        has_gpu = False
 
-try:
-    sp.check_call(['nvidia-smi'])
-    has_gpu = True
-except (OSError, sp.CalledProcessError):
-    has_gpu = False
+    needs_gpu = pytest.mark.skipif(not has_gpu, reason='need GPU to run')
 
-needs_gpu = pytest.mark.skipif(not has_gpu, reason='need GPU to run')
+else:
+    needs_gpu = pytest.mark.skipif(True, reason='')
 
 
 @pytest.fixture(scope='module')
