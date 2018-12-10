@@ -27,12 +27,6 @@ RUN if [ "$tag2" != "cpu" ]; then \
             rm -rf /var/lib/apt/lists/*; \
     fi
 
-# Install gentle forced aligner
-RUN git clone https://github.com/scanner-research/gentle && \
-   cd gentle && \
-   bash ./install.sh && \
-   cd .. && rm -rf gentle
-
 COPY . scannertools
 RUN cd scannertools && pip3 install --upgrade setuptools && python3 setup.py install
 RUN cd scannertools/scannertools/cpp_ops && \
