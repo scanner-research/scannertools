@@ -32,7 +32,7 @@ ENV NO_AVX512=1
 RUN apt-get update && apt-get install -y sox
 RUN git clone https://github.com/scanner-research/gentle --recursive && \
    cd gentle && \
-   (bash ./install.sh &> /dev/null) && \
+   (./install.sh &> /dev/null) && \
    cd .. && rm -rf gentle
 
 COPY . scannertools
