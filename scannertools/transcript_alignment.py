@@ -316,7 +316,7 @@ class TranscriptAligner():
             if word[2] in offset2time:
                 estimate_shift = offset2time[word[2]] - word[1]
                 break
-#         print(num_word_aligned, estimate_shift)
+        print(num_word_aligned, estimate_shift)
 #         print(align_word_list)
         return estimate_shift
     
@@ -492,7 +492,7 @@ class AlignTranscriptPipeline(Pipeline):
     job_suffix = 'align_transcript'
     base_sources = ['audio', 'captions']
     run_opts = {'pipeline_instances_per_node': 8, 'io_packet_size': 4, 'work_packet_size': 4, 'checkpoint_frequency': 20}
-    custom_opts = ['seg_length', 'max_misalign', 'num_thread', 'exhausted']
+    custom_opts = ['align_opts']
 #     parser_fn = lambda _: lambda buf, _: pickle.loads(buf)
     parser_fn = lambda _: parse
 
@@ -502,10 +502,10 @@ class AlignTranscriptPipeline(Pipeline):
             self._db.ops.AlignTranscript(
                 audio=self._sources['audio'].op,
                 captions=self._sources['captions'].op,
-                seg_length=self._custom_opts['seg_length'],
-                max_misalign=self._custom_opts['max_misalign'],
-                num_thread=self._custom_opts['num_thread'],
-                exhausted=self._custom_opts['exhausted']
+                seg_length=self._custom_opts['align_opts']['seg_length'],
+                max_misalign=self._custom_opts['align_opts']['max_misalign'],
+                num_thread=self._custom_opts['align_opts']['num_thread'],
+                exhausted=self._custom_opts['align_opts']['exhausted']
                 )
         }
 
@@ -525,8 +525,10 @@ class AlignTranscriptPipeline(Pipeline):
 
 align_transcript_pipeline = AlignTranscriptPipeline.make_runner()
 
-def align_transcript(db, video_list, audio, caption, cache=False, align_dir=None, res_path=None):
-    result = align_transcript_pipeline(db=db, audio=audio, captions=caption, cache=cache)
+def align_transcript(db, video_list, audio, caption, run_opts, align_opts, cache=True):
+    result = align_transcript_pipeline(db=db, audio=audio, captions=caption, cache=cache, run_opts=run_opts, align_opts=align_opts)
+    align_dir = align_opts['align_dir']
+    res_path = align_opts['res_path']
     if align_dir is None or res_path is None:
         return 
 
