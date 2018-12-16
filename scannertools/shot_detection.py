@@ -24,7 +24,7 @@ def shot_boundaries(config, histograms: Sequence[bytes]) -> Sequence[bytes]:
     boundaries = []
     for i in range(1, n):
         window = diffs[max(i - WINDOW_SIZE, 0):min(i + WINDOW_SIZE, n)]
-        if diffs[i] - np.mean(window) > 3 * np.std(window):
+        if diffs[i] - np.mean(window) > 2.5 * np.std(window):
             boundaries.append(i)
 
     return [pickle.dumps(boundaries)] + ['\0' for _ in range(len(histograms)-1)]
@@ -43,10 +43,10 @@ class ShotBoundaryPipeline(Pipeline):
 
     def parse_output(self):
         boundaries = super().parse_output()
-        def load(b):
-            return pickle.loads(next(b._column.load(rows=[0]))) \
-                if b is not None else None
-        return par_for(load, boundaries, workers=8)
+        return [
+            pickle.loads(next(b._column.load(rows=[0])))
+            if b is not None else None
+            for b in boundaries]
 
 compute_shot_boundaries = ShotBoundaryPipeline.make_runner()
 
