@@ -243,6 +243,9 @@ class Pipeline(ABC):
             for k in source_keys:
                 src = self._sources[k]
                 if src.args is not None:
+                    if i >= len(src.args):
+                        raise Exception('Source {} arguments had length {}, expected {}' \
+                                        .format(k, len(src.args), i))
                     map_[src.op] = src.args[i]
             map_[self._sink.op] = self._sink.args[i]
             return Job(op_args=map_)
