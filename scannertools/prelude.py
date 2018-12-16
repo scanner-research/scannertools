@@ -39,6 +39,7 @@ def try_import(to_import, current_module):
 
 log = logging.getLogger('scannertools')
 log.setLevel(logging.DEBUG)
+log.propagate = False
 if not log.handlers:
 
     class CustomFormatter(logging.Formatter):
@@ -242,6 +243,9 @@ class Pipeline(ABC):
             for k in source_keys:
                 src = self._sources[k]
                 if src.args is not None:
+                    if i >= len(src.args):
+                        raise Exception('Source {} arguments had length {}, expected {}' \
+                                        .format(k, len(src.args), i))
                     map_[src.op] = src.args[i]
             map_[self._sink.op] = self._sink.args[i]
             return Job(op_args=map_)
@@ -307,6 +311,7 @@ class Pipeline(ABC):
         raise NotImplemented
 
     def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, cpu_only=False, detach=False, megabatch=10000, cache=True):
+        self._custom_run_opts = {**self.run_opts, **run_opts}
         self._custom_opts = custom_opts
 
         self._cpu_only = cpu_only or not self._db.has_gpu()
@@ -325,7 +330,7 @@ class Pipeline(ABC):
             print('Executing {} jobs'.format(len(jobs)))
             for i in range(0, len(jobs), megabatch):
                 print('Megabatch {}/{}'.format(int(i/megabatch+1), int(math.ceil(len(jobs) / float(megabatch)))))
-                self._db.run(self._sink.op, jobs[i:i+megabatch], detach=detach, force=True, **{**self.run_opts, **run_opts})
+                self._db.run(self._sink.op, jobs[i:i+megabatch], detach=detach, force=True, **self._custom_run_opts)
 
         if detach:
             return

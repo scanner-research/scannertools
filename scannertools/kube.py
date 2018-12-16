@@ -185,7 +185,6 @@ class ClusterConfig:
     worker = attrib(type=MachineConfig)
     zone = attrib(type=str, default='us-east1-b')
     kube_version = attrib(type=str, default='latest')
-    workers_per_node = attrib(type=int, default=1)
     num_load_workers = attrib(type=int, default=8)
     num_save_workers = attrib(type=int, default=8)
     autoscale = attrib(type=bool, default=False)
@@ -304,8 +303,6 @@ class Cluster:
                  'value': '1'},
                 {'name': 'GLOG_v',
                  'value': '2' if name == 'master' else '1'},
-                {'name': 'WORKERS_PER_NODE',
-                 'value': str(self._cluster_config.workers_per_node)},
                 {'name': 'NUM_LOAD_WORKERS',
                  'value': str(self._cluster_config.num_load_workers)},
                 {'name': 'NUM_SAVE_WORKERS',
@@ -662,13 +659,13 @@ class Cluster:
 
         return values
 
-    def master_logs(self):
+    def master_logs(self, previous=False):
         master = self.get_pod('scanner-master')
-        print(run('kubectl logs pod/{} master'.format(master['metadata']['name'])))
+        print(run('kubectl logs pod/{} master {}'.format(master['metadata']['name'], '--previous' if previous else '')))
 
-    def worker_logs(self, n):
+    def worker_logs(self, n, previous=False):
         workers = [pod for pod in self.get_kube_info('pod')['items'] if pod['metadata']['labels']['app'] == 'scanner-worker']
-        print(run('kubectl logs pod/{} worker'.format(workers[n]['metadata']['name'])))
+        print(run('kubectl logs pod/{} worker {}'.format(workers[n]['metadata']['name'], '--previous' if previous else '')))
 
     def latest_trace(self, path, subsample=None):
         print('Writing trace...')
@@ -710,9 +707,11 @@ class Cluster:
         resize.add_argument('size', type=int, help='Number of nodes')
         command.add_parser('get-credentials')
         command.add_parser('job-status')
-        command.add_parser('master-logs')
+        master_logs = command.add_parser('master-logs')
+        master_logs.add_argument('--previous', '-p', action='store_true')
         worker_logs = command.add_parser('worker-logs')
         worker_logs.add_argument('n', type=int, help='Index of worker')
+        worker_logs.add_argument('--previous', '-p', action='store_true')
         latest_trace = command.add_parser('latest-trace')
         latest_trace.add_argument('path')
         latest_trace.add_argument('--subsample', type=int)
@@ -734,10 +733,10 @@ class Cluster:
             self.job_status()
 
         elif args.command == 'master-logs':
-            self.master_logs()
+            self.master_logs(previous=args.previous)
 
         elif args.command == 'worker-logs':
-            self.worker_logs(args.n)
+            self.worker_logs(args.n, previous=args.previous)
 
         elif args.command == 'latest-trace':
             self.latest_trace(args.path, subsample=args.subsample)
@@ -762,7 +761,6 @@ def worker():
     machine_params.ParseFromString(default_machine_params())
     machine_params.num_load_workers = int(os.environ['NUM_LOAD_WORKERS'])
     machine_params.num_save_workers = int(os.environ['NUM_SAVE_WORKERS'])
-    num_workers = int(os.environ['WORKERS_PER_NODE'])
 
     log.info('Scannertools: starting worker...')
     scannerpy.start_worker(
@@ -771,5 +769,4 @@ def worker():
         machine_params=machine_params.SerializeToString(),
         block=True,
         watchdog=False,
-        port=5002,
-        num_workers=num_workers if num_workers > 1 else None)
+        port=5002)

@@ -23,26 +23,30 @@ from scannertools import face_detection, Video, imwrite
 import scannerpy
 import cv2
 
-# Get a reference to the video
-video = Video('path/to/your/video.mp4')
-frame_nums = list(range(0, video.num_frames(), 10))
+def main():
+    # Get a reference to the video
+    video = Video('path/to/your/video.mp4')
+    frame_nums = list(range(0, video.num_frames(), 10))
 
-# Run the face detection algorithm
-db = scannerpy.Database()
-face_bboxes = face_detection.detect_faces(db, videos=[video], frames=[frame_nums])
+    # Run the face detection algorithm
+    db = scannerpy.Database()
+    face_bboxes = face_detection.detect_faces(db, videos=[video], frames=[frame_nums])
 
-# Draw the bounding boxes
-frame = video.frame(frame_nums[3])
-for bbox in list(face_bboxes.load())[3]:
-    cv2.rectangle(
-        frame,
-        (int(bbox.x1 * video.width()), int(bbox.y1 * video.height())),
-        (int(bbox.x2 * video.width()), int(bbox.y2 * video.height())),
-        (255, 0, 0),
-        4)
+    # Draw the bounding boxes
+    frame = video.frame(frame_nums[3])
+    for bbox in list(face_bboxes.load())[3]:
+        cv2.rectangle(
+            frame,
+            (int(bbox.x1 * video.width()), int(bbox.y1 * video.height())),
+            (int(bbox.x2 * video.width()), int(bbox.y2 * video.height())),
+            (255, 0, 0),
+            4)
 
-# Save the image to disk
-imwrite('example.jpg', frame)
+    # Save the image to disk
+    imwrite('example.jpg', frame)
+
+if __name__ == "__main__":
+    main()
 ```
 
 For more examples, see the [examples](https://github.com/scanner-research/scannertools/tree/master/examples) directory. For the API reference, see our [documentation](https://scanner-research.github.io/scannertools/).
