@@ -204,7 +204,10 @@ class ScannerColumn(DataSource):
         if self._parser is None:
             raise Exception("Pipeline used default Scanner output but did not provide a parser_fn")
 
-        return self._column.load(self._parser, workers=workers)
+        if workers is None:
+            return self._column.load(self._parser)
+        else:
+            return self._column.load(self._parser, workers=workers)
 
     def scanner_source(self, db):
         return db.sources.Column()
