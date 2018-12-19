@@ -263,20 +263,22 @@ class TranscriptAligner():
                 elif word['start'] >= seg_shift:
                     num_word_aligned += 1
                     enter_alignment = True
+                    cur_start = word['start'] + seg_start
+                    cur_end = word['end'] + seg_start
+                    # make sure the prev_end <= cur_start
+                    if len(align_word_list) > 0:
+                        prev_end = align_word_list[-1][1][1]
+                        if prev_end > cur_start and prev_end < cur_end:
+                            cur_start = prev_end
+                    # mis-aligned word handling
                     if len(word_missing) <= 2:
                         num_word_aligned += len(word_missing)
                     if len(word_missing) > 0:
-                        start = align_word_list[-1][1][1]
-                        end = word['start'] + seg_start
-                        # start may be greater than end
-                        if start > end:
-                            end = start
-                        step = (end - start) / len(word_missing)
+                        step = (cur_start - prev_end) / len(word_missing)
                         for i, w in enumerate(word_missing):
-                            align_word_list.append(('{'+w+'}', (start+i*step, start+(i+1)*step)))
+                            align_word_list.append(('{'+w+'}', (prev_end+i*step, prev_end+(i+1)*step)))
                         word_missing = []
-
-                    align_word_list.append((word['word'], (word['start'] + seg_start, word['end'] + seg_start)))
+                    align_word_list.append((word['word'], (cur_start, cur_end)))
         return {'align_word_list': align_word_list, 'num_word_aligned': num_word_aligned}    
     
     def estimate_shift_clip(self, audio_path, audio_start, transcript, offset2time):
@@ -373,7 +375,7 @@ class TranscriptAligner():
 ###########################################
 # Modified methods for scanner pipeline
 ###########################################
-    def run_segment_scanner(self, audio, caption):
+    def run_segment_scanner(self, audio_pkg, caption_pkg):
         def extract_transcript(seg_idx, caption, start, end, offset_to_time=False):
             if offset_to_time:
                 offset2time = {}
@@ -407,7 +409,7 @@ class TranscriptAligner():
                 offset2punc.sort()
                 return text_total, offset2punc 
         
-        def extract_audio(audio, seg_type, clip=None):
+        def extract_audio(audio, seg_type=None, clip=None):
             audio_shift = self.audio_rate * self.audio_shift
             if clip is None:
                 if seg_type == 'left':
@@ -423,29 +425,29 @@ class TranscriptAligner():
             return audio_path    
         
         # entrance
-        self.audio_rate = audio[0].shape[0] // self.seg_length
+        self.audio_rate = audio_pkg[0].shape[0] // self.seg_length
         if not self.estimate:
             # get center seg index
-            if len(caption[1]) == 0:
+            if len(caption_pkg[1]) == 0:
                 return {'align_word_list': [], 'num_word_aligned': 0, 'num_word_total': 0}
             else:
-                seg_idx = int(caption[1][0]['start'] // self.seg_length)
-            left_bound = 1 if (audio[0][:100] == audio[1][:100]).all() else 0
-            right_bound = 1 if (audio[1][:100] == audio[2][:100]).all() else 2
+                seg_idx = int(caption_pkg[1][0]['start'] // self.seg_length)
+            left_bound = 1 if (audio_pkg[0][:100] == audio_pkg[1][:100]).all() else 0
+            right_bound = 1 if (audio_pkg[1][:100] == audio_pkg[2][:100]).all() else 2
             if left_bound != 0:
                 seg_type = 'left'
             elif right_bound != 2:
                 seg_type = 'right'
             else:
                 seg_type = 'middle'
-            audio_path = extract_audio(audio, seg_type)
-            transcript, punctuation = extract_transcript(seg_idx, caption[left_bound: right_bound+1], 
+            audio_path = extract_audio(audio_pkg, seg_type=seg_type)
+            transcript, punctuation = extract_transcript(seg_idx, caption_pkg[left_bound: right_bound+1], 
                                                          seg_idx*self.seg_length - self.text_shift, 
                                                          (seg_idx+1)*self.seg_length + self.text_shift)
             result_seg = self.align_segment(seg_idx, audio_path, transcript, punctuation)
             # count total number of words
             num_words = 0
-            for line in caption[1]:
+            for line in caption_pkg[1]:
                 for w in line['line'].replace('.', ' ').replace('-', ' ').split():
                     num_words += 1 if w.islower() or w.isupper() else 0
             result_seg['num_word_total'] = num_words
@@ -513,9 +515,14 @@ class TranscriptAligner():
                                                          offset_to_time=False)
                 result_seg = self.align_segment(seg_abs, audio_path, transcript, punctuation)
                 result_win['align_word_list'] += result_seg['align_word_list']
-                result_win['align_word_list'] += result_seg['align_word_list']
-                result_win['align_word_list'] += result_seg['align_word_list']
-            return result_win    
+                result_win['num_word_aligned'] += result_seg['num_word_aligned']
+                # count total number of words
+                num_words = 0
+                for line in caption_pkg[seg_rel]:
+                    for w in line['line'].replace('.', ' ').replace('-', ' ').split():
+                        num_words += 1 if w.islower() or w.isupper() else 0
+                result_win['num_word_total'] += num_words
+            return result_win
 
         
     @staticmethod
