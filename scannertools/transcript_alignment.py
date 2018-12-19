@@ -402,7 +402,7 @@ class TranscriptAligner():
                             pp = p.replace('[', '').replace(']', '')
                             for match in re.finditer(p, text):
                                 offset2punc.append((match.start()+offset, pp))
-                text_total += text + ' '
+                    text_total += text + ' '
             if offset_to_time:         
                 return text_total, offset2time 
             else:
@@ -458,12 +458,12 @@ class TranscriptAligner():
             # get center seg
             is_empty_window = True
             for shift in range(num_seg_in_win // 2):
-                if len(caption[seg_center_rel + shift]) > 0:
-                    seg_center_abs = int(caption[seg_center_rel + shift][0]['start'] // self.seg_length) - shift
+                if len(caption_pkg[seg_center_rel + shift]) > 0:
+                    seg_center_abs = int(caption_pkg[seg_center_rel + shift][0]['start'] // self.seg_length) - shift
                     is_empty_window = False
                     break
-                if len(caption[seg_center_rel - shift]) > 0:
-                    seg_center_abs = int(caption[seg_center_rel - shift][0]['start'] // self.seg_length) + shift
+                if len(caption_pkg[seg_center_rel - shift]) > 0:
+                    seg_center_abs = int(caption_pkg[seg_center_rel - shift][0]['start'] // self.seg_length) + shift
                     is_empty_window = False
                     break
             if is_empty_window or seg_center_abs % num_seg_in_win != num_seg_in_win // 2:
@@ -472,16 +472,16 @@ class TranscriptAligner():
             # get left right boundary
             left_bound = right_bound = None
             for shift in range(seg_center_rel): # error
-                if not left_bound is None and (audio[seg_center_rel-shift][:100] == audio[seg_center_rel-shift-1][:100]).all():
+                if not left_bound is None and (audio_pkg[seg_center_rel-shift][:100] == audio_pkg[seg_center_rel-shift-1][:100]).all():
                     left_bound = seg_center_rel - shift
-                if not right_bound is None and (audio[seg_center_rel+shift][:100] == audio[seg_center_rel+shift+1][:100]).all():
+                if not right_bound is None and (audio_pkg[seg_center_rel+shift][:100] == audio_pkg[seg_center_rel+shift+1][:100]).all():
                     right_bound = seg_center_rel + shift
             left_bound = 0 if left_bound is None else left_bound
             right_bound = len(caption)-1 if right_bound is None else right_bound
             print(seg_center_abs, win_idx, left_bound, right_bound)
             return {}
             # sample clip to estimate shift
-            transcript, offset2time = extract_transcript(caption[left_bound : right_bound+1],  ###
+            transcript, offset2time = extract_transcript(caption_pkg[left_bound : right_bound+1],  ###
                                                          (win_idx-1) * self.win_size, 
                                                          (win_idx+2) * self.win_size, 
                                                          offset_to_time=True)
@@ -492,7 +492,7 @@ class TranscriptAligner():
                     continue
                 seg_abs = seg_center_abs + shift
                 audio_start = seg_abs * self.seg_length + self.seg_length//2
-                audio_path = extract_audio(audio[seg_rel], self.seg_length//2, self.seg_length//2 + self.clip_length) ###
+                audio_path = extract_audio(audio_pkg[seg_rel], clip=(self.seg_length//2, self.seg_length//2 + self.clip_length)) ###
                 shift = self.estimate_shift_clip(audio_path, audio_start, transcript, offset2time) ###
                 if not shift is None:
                     shift_list.append(shift)
@@ -508,8 +508,14 @@ class TranscriptAligner():
                 if seg_rel < left_bound or seg_rel > right_bound:
                     continue
                 seg_abs = seg_center_abs + shift
-                audio_path = extract_audio(audio[seg_rel]) ###
-                transcript, punctuation = extract_transcript(seg_abs, caption[left_bound : right_bound+1], ###
+                if seg_rel == left_bound:
+                    seg_type = 'left'
+                elif seg_rel == right_bound:
+                    seg_type = 'right'
+                else:
+                    seg_type = 'middle'
+                audio_path = extract_audio(audio_pkg[seg_rel-1:seg_rel+2], seg_type=seg_type) ###
+                transcript, punctuation = extract_transcript(seg_abs, caption_pkg[left_bound : right_bound+1], ###
                                                          seg_abs * self.seg_length - self.text_shift - win_shift, 
                                                          (seg_abs + 1) * self.seg_length + self.text_shift - win_shift,
                                                          offset_to_time=False)
