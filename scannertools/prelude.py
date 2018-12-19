@@ -200,11 +200,14 @@ class ScannerColumn(DataSource):
         self._column = column
         self._parser = parser
 
-    def load(self):
+    def load(self, workers=None):
         if self._parser is None:
             raise Exception("Pipeline used default Scanner output but did not provide a parser_fn")
 
-        return self._column.load(self._parser)
+        if workers is None:
+            return self._column.load(self._parser)
+        else:
+            return self._column.load(self._parser, workers=workers)
 
     def scanner_source(self, db):
         return db.sources.Column()
@@ -243,6 +246,9 @@ class Pipeline(ABC):
             for k in source_keys:
                 src = self._sources[k]
                 if src.args is not None:
+                    if i >= len(src.args):
+                        raise Exception('Source {} arguments had length {}, expected {}' \
+                                        .format(k, len(src.args), i))
                     map_[src.op] = src.args[i]
             map_[self._sink.op] = self._sink.args[i]
             return Job(op_args=map_)
