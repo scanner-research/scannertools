@@ -479,7 +479,6 @@ class TranscriptAligner():
                     right_bound = seg_center_rel + s
             left_bound = 0 if left_bound is None else left_bound
             right_bound = len(audio_pkg)-1 if right_bound is None else right_bound
-#             print(seg_center_rel, seg_center_abs, win_idx, left_bound, right_bound)
             # sample clip to estimate shift
             transcript, offset2time = extract_transcript(caption_pkg[left_bound : right_bound+1],
                                                          (win_idx-1) * self.win_size, 
@@ -493,7 +492,6 @@ class TranscriptAligner():
                 seg_abs = seg_center_abs + s
                 audio_start = seg_abs * self.seg_length + self.seg_length//2
                 audio_path = extract_audio(audio_pkg[seg_rel], clip=(self.seg_length//2, self.seg_length//2 + self.clip_length))
-                print('+++', win_idx, s, seg_rel, seg_abs, audio_start)
                 clip_shift = self.estimate_shift_clip(audio_path, audio_start, transcript, offset2time)
                 if not clip_shift is None:
                     shift_list.append(clip_shift)
@@ -502,7 +500,6 @@ class TranscriptAligner():
             else:
                 shift_list.sort()
                 win_shift = np.median(shift_list)
-#             print('win_shift', win_idx, win_shift)
             # align all segments inside the window
             result_win = {'align_word_list': [], 'num_word_aligned': 0, 'num_word_total': 0}
             for s in range(-(num_seg_in_win // 2), num_seg_in_win // 2+1):
