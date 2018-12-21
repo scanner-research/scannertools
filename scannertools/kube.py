@@ -259,7 +259,10 @@ class Cluster:
                 pool=pool)) != ''
 
     def get_credentials(self):
-        run('{cmd} get-credentials {id}'.format(cmd=self._cluster_cmd, id=self._cluster_config.id))
+        if self._cluster_config.id not in run(
+                'kubectl config view -o json | jq \'.["current-context"]\' -r'):
+            run('{cmd} get-credentials {id}'.format(
+                cmd=self._cluster_cmd, id=self._cluster_config.id))
 
     def create_object(self, template):
         with tempfile.NamedTemporaryFile() as f:
@@ -515,13 +518,8 @@ class Cluster:
 
     def start(self, reset=True, wait=True):
         self._cluster_start()
-
-        if self._cluster_config.id not in run(
-                'kubectl config view -o json | jq \'.["current-context"]\' -r'):
-            self.get_credentials()
-
+        self.get_credentials()
         self._kube_start(reset, wait)
-
         log.info('Finished startup.')
 
     def resize(self, size):
@@ -667,19 +665,26 @@ class Cluster:
         workers = [pod for pod in self.get_kube_info('pod')['items'] if pod['metadata']['labels']['app'] == 'scanner-worker']
         print(run('kubectl logs pod/{} worker {}'.format(workers[n]['metadata']['name'], '--previous' if previous else '')))
 
-    def latest_trace(self, path, subsample=None):
-        print('Writing trace...')
+    def trace(self, path, subsample=None, job=None):
+        self.get_credentials()
+
         db = self.database()
-        job = max([
-            int(line.split('/')[-2])
-            for line in sp.check_output('gsutil ls gs://{}/{}/jobs'.format(
-                    db.config.config['storage']['bucket'],
-                    db.config.db_path),
-                shell=True) \
-            .decode('utf-8').split('\n')[:-1]
-        ])
+
+        # Get most recent job id if none is provided
+        if job is None:
+            log.info('Fetching job ID')
+            job = max([
+                int(line.split('/')[-2])
+                for line in sp.check_output('gsutil ls gs://{}/{}/jobs'.format(
+                        db.config.config['storage']['bucket'],
+                        db.config.db_path),
+                    shell=True) \
+                .decode('utf-8').split('\n')[:-1]
+            ])
+
+        log.info('Writing trace...')
         db.profiler(job, subsample=subsample).write_trace(path)
-        print('Trace written.')
+        log.info('Trace written.')
 
     def __enter__(self):
         if not self._no_start:
@@ -694,27 +699,28 @@ class Cluster:
         parser = argparse.ArgumentParser()
         command = parser.add_subparsers(dest='command')
         command.required = True
-        create = command.add_parser('start')
+        create = command.add_parser('start', help='Create cluster')
         create.add_argument(
             '--no-reset', '-nr', action='store_true', help='Delete current deployments')
         create.add_argument('--no-wait', '-nw', action='store_true', help='Don\'t wait for master')
         create.add_argument(
             '--num-workers', '-n', type=int, default=1, help='Initial number of workers')
-        delete = command.add_parser('delete')
+        delete = command.add_parser('delete', help='Delete cluster')
         delete.add_argument(
             '--no-prompt', '-np', action='store_true', help='Don\'t prompt for deletion')
-        resize = command.add_parser('resize')
+        resize = command.add_parser('resize', help='Resize number of nodes in cluster')
         resize.add_argument('size', type=int, help='Number of nodes')
-        command.add_parser('get-credentials')
-        command.add_parser('job-status')
-        master_logs = command.add_parser('master-logs')
-        master_logs.add_argument('--previous', '-p', action='store_true')
-        worker_logs = command.add_parser('worker-logs')
+        command.add_parser('get-credentials', help='Setup kubectl with credentials')
+        command.add_parser('job-status', help='View status of current running job')
+        master_logs = command.add_parser('master-logs', help='Get logs of Scanner master')
+        master_logs.add_argument('--previous', '-p', action='store_true', help='Get logs for previous container')
+        worker_logs = command.add_parser('worker-logs', help='Get logs of a Scanner worker')
         worker_logs.add_argument('n', type=int, help='Index of worker')
-        worker_logs.add_argument('--previous', '-p', action='store_true')
-        latest_trace = command.add_parser('latest-trace')
-        latest_trace.add_argument('path')
-        latest_trace.add_argument('--subsample', type=int)
+        worker_logs.add_argument('--previous', '-p', action='store_true', help='Get logs for previous container')
+        trace = command.add_parser('trace', help='Extract profiler trace')
+        trace.add_argument('path', help='Path to output trace')
+        trace.add_argument('--subsample', type=int, help='Number of workers to include in trace')
+        trace.add_argument('--job', type=int, help='Job ID to extract (default is latest)')
 
         args = parser.parse_args()
         if args.command == 'start':
@@ -738,8 +744,8 @@ class Cluster:
         elif args.command == 'worker-logs':
             self.worker_logs(args.n, previous=args.previous)
 
-        elif args.command == 'latest-trace':
-            self.latest_trace(args.path, subsample=args.subsample)
+        elif args.command == 'trace':
+            self.trace(args.path, subsample=args.subsample, job=args.job)
 
 
 def master():
