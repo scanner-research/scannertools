@@ -267,7 +267,7 @@ class Pipeline(ABC):
         sources = {}
 
         if videos is not None:
-            self._ingest(videos)
+            self.ingest(videos)
 
             frame = self._db.sources.FrameColumn()
             sources['frame'] = BoundOp(
