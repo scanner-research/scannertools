@@ -227,10 +227,12 @@ class Pipeline(ABC):
     def __init__(self, db):
         self._db = db
 
-    def _ingest(self, videos, batch=500):
-        videos = [v for v in videos if not self._db.has_table(v.scanner_name())]
-        if len(videos) > 0:
-            for i in tqdm(range(0, len(videos), batch)):
+    def ingest(self, videos, batch=500, force=False):
+        videos = [v for v in videos if force or not self._db.has_table(v.scanner_name())]
+        n = len(videos)
+        if n > 0:
+            print('Ingesting {} videos'.format(n))
+            for i in tqdm(range(0, n, batch), smoothing=0):
                 self._db.ingest_videos([
                     (v.scanner_name(), v.path())
                     for v in videos[i:i+batch]
