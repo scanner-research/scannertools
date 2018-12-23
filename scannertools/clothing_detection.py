@@ -232,8 +232,8 @@ class DetectClothing(TorchKernel):
                         continue
                     if bbox.y2 < other_bbox.y1:
                         center = (bbox.x1  + bbox.x2) / 2
-                        crop_x1 = (center - face.x2 + face.x1)
-                        crop_x2 = (center + face.x2 - face.x1)
+                        crop_x1 = (center - bbox.x2 + bbox.x1)
+                        crop_x2 = (center + bbox.x2 - bbox.x1)
                         if other_bbox.x1 < crop_x2 or other_bbox.x2 > crop_x1:
                             body_bound = other_bbox.y1
 
