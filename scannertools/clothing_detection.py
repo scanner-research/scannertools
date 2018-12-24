@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 MODEL_URL = 'https://storage.googleapis.com/esper/models/clothing/model_newsanchor.tar'
-MODEL_DEF_URL = 'https://raw.githubusercontent.com/sola777/video-analysis/master/streetstyle-classifier/classifier/newsanchor_classifier_model.py'
+MODEL_DEF_URL = 'https://raw.githubusercontent.com/Haotianz94/video-analysis/master/streetstyle-classifier/classifier/newsanchor_classifier_model.py'
 
 
 ATTRIBUTES = [
