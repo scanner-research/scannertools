@@ -21,7 +21,7 @@ class OpticalFlowPipeline(Pipeline):
             'flow':
             self._db.ops.OpticalFlow(
                 frame=self._sources['frame_sampled'].op,
-                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
+                device=self._device)
         }
 
 

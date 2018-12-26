@@ -111,10 +111,13 @@ class TorchKernel(Kernel):
                 self.cpu_only = False
 
         self.model = self.build_model()
-
+        
         if not self.cpu_only:
+            print('Using GPU: {}'.format(visible_device_list[0]))
             torch.cuda.set_device(visible_device_list[0])
             self.model = self.model.cuda()
+        else:
+            print('Using CPU')
 
         # Not sure if this is necessary? Haotian had it in his code
         self.model.eval()
@@ -142,7 +145,8 @@ class TorchKernel(Kernel):
         raise NotImplementedError
 
 
-@scannerpy.register_python_op()
+@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU)
+@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU)
 class DetectClothing(TorchKernel):
     def __init__(self, config):
         from torchvision import transforms
@@ -272,7 +276,6 @@ class ClothingDetectionPipeline(Pipeline):
     job_suffix = 'clothing'
     parser_fn = lambda _: parse_clothing
     additional_sources = ['bboxes']
-    run_opts = {'pipeline_instances_per_node': 1}
 
     def fetch_resources(self):
         try_import('torch', __name__)
@@ -284,13 +287,14 @@ class ClothingDetectionPipeline(Pipeline):
     def build_pipeline(self, adjust_bboxes=True):
         return {
             'clothing':
-            self._db.ops.DetectClothing(
+            getattr(self._db.ops, 'DetectClothing{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
                 frame=self._sources['frame_sampled'].op,
                 bboxes=self._sources['bboxes'].op,
                 model_path=self._model_path,
                 model_def_path=self._model_def_path,
                 model_key='best_model',
-                adjust_bboxes=adjust_bboxes)
+                adjust_bboxes=adjust_bboxes,
+                device=self._device)
         }
 
 

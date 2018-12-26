@@ -80,9 +80,9 @@ class FaceDetectionPipeline(Pipeline):
         import align
         return {
             'bboxes':
-            getattr(self._db.ops, 'MTCNNDetectFaces{}'.format('GPU' if self._db.has_gpu() else 'CPU'))(
+            getattr(self._db.ops, 'MTCNNDetectFaces{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
                 frame=self._sources['frame_sampled'].op, model_dir=os.path.dirname(align.__file__),
-                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
+                device=self._device)
         }
 
 

@@ -60,9 +60,10 @@ class FaceLandmarkDetectionPipeline(Pipeline):
 
     def build_pipeline(self):
         return { 'face_landmarks':
-            getattr(self._db.ops, 'DetectFaceLandmarks{}'.format('GPU' if self._db.has_gpu() else 'CPU'))(
+            getattr(self._db.ops, 'DetectFaceLandmarks{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
             frame=self._sources['frame_sampled'].op,
             bboxes=self._sources['bboxes'].op,
-            device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU) }
+            device=self._device)
+        }
 
 detect_face_landmarks = FaceLandmarkDetectionPipeline.make_runner()
