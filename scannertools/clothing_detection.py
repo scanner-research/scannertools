@@ -7,6 +7,7 @@ import pickle
 import sys
 import os
 import numpy as np
+from typing import Sequence
 
 MODEL_URL = 'https://storage.googleapis.com/esper/models/clothing/model_newsanchor.tar'
 MODEL_DEF_URL = 'https://raw.githubusercontent.com/Haotianz94/video-analysis/master/streetstyle-classifier/classifier/newsanchor_classifier_model.py'
@@ -106,7 +107,7 @@ class TorchKernel(Kernel):
         self.cpu_only = True
         visible_device_list = []
         for handle in config.devices:
-            if handle.type == DeviceType.GPU.value:
+            if int(handle.type) == DeviceType.GPU.value:
                 visible_device_list.append(handle.id)
                 self.cpu_only = False
 
@@ -116,8 +117,6 @@ class TorchKernel(Kernel):
             print('Using GPU: {}'.format(visible_device_list[0]))
             torch.cuda.set_device(visible_device_list[0])
             self.model = self.model.cuda()
-        else:
-            print('Using CPU')
 
         # Not sure if this is necessary? Haotian had it in his code
         self.model.eval()
@@ -145,8 +144,8 @@ class TorchKernel(Kernel):
         raise NotImplementedError
 
 
-@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU)
-@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU)
+@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=64)
+@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=64)
 class DetectClothing(TorchKernel):
     def __init__(self, config):
         from torchvision import transforms
@@ -196,75 +195,83 @@ class DetectClothing(TorchKernel):
                 return y
         return H
 
-    def execute(self, frame: FrameType, bboxes: bytes) -> bytes:
+    def execute(self, frame: Sequence[FrameType], bboxes: Sequence[bytes]) -> Sequence[bytes]:
         from PIL import Image
         from torch.autograd import Variable
         import torch
 
-        h, w = frame.shape[:2]
-        bboxes = readers.bboxes(bboxes, self.config.protobufs)
-        if len(bboxes) == 0:
-            return pickle.dumps([])
+        h, w = frame[0].shape[:2]
 
-        if self.config.args['adjust_bboxes']:
-            images = []
-            for i, bbox in enumerate(bboxes):
-                x1 = int(bbox.x1 * w)
-                y1 = int(bbox.y1 * h)
-                x2 = int(bbox.x2 * w)
-                y2 = int(bbox.y2 * h)
+        counts = []
+        images = []
+        for i, (fram, bbs) in enumerate(zip(frame, bboxes)):
+            bbs = readers.bboxes(bbs, self.config.protobufs)
+            counts.append((counts[i - 1][0] + counts[i - 1][1] if i > 0 else 0, len(bbs)))
+            if len(bboxes) == 0:
+                raise Exception("No bounding boxes")
 
-                ## set crop window
-                crop_w = (x2 - x1) * 2
-                crop_h = crop_w * 2
-                X1 = int((x1 + x2) / 2 - crop_w / 2)
-                X2 = X1 + crop_w
-                Y1 = int((y1 + y2) / 2 - crop_h / 3)
-                Y2 = Y1 + crop_h
+            if self.config.args['adjust_bboxes']:
+                for i, bbox in enumerate(bbs):
+                    x1 = int(bbox.x1 * w)
+                    y1 = int(bbox.y1 * h)
+                    x2 = int(bbox.x2 * w)
+                    y2 = int(bbox.y2 * h)
 
-                ## adjust box size by image boundary
-                crop_x1 = max(0, X1)
-                crop_x2 = min(w-1, X2)
-                crop_y1 = max(0, Y1)
-                crop_y2 = min(h-1, Y2)
-                cropped = frame[crop_y1:crop_y2+1, crop_x1:crop_x2+1, :]
+                    ## set crop window
+                    crop_w = (x2 - x1) * 2
+                    crop_h = crop_w * 2
+                    X1 = int((x1 + x2) / 2 - crop_w / 2)
+                    X2 = X1 + crop_w
+                    Y1 = int((y1 + y2) / 2 - crop_h / 3)
+                    Y2 = Y1 + crop_h
 
-                ## compute body bound
-                body_bound = 1.0
-                for j, other_bbox in enumerate(bboxes):
-                    if i == j:
-                        continue
-                    if bbox.y2 < other_bbox.y1:
-                        center = (bbox.x1  + bbox.x2) / 2
-                        crop_x1 = (center - bbox.x2 + bbox.x1)
-                        crop_x2 = (center + bbox.x2 - bbox.x1)
-                        if other_bbox.x1 < crop_x2 or other_bbox.x2 > crop_x1:
-                            body_bound = other_bbox.y1
+                    ## adjust box size by image boundary
+                    crop_x1 = max(0, X1)
+                    crop_x2 = min(w-1, X2)
+                    crop_y1 = max(0, Y1)
+                    crop_y2 = min(h-1, Y2)
+                    cropped = fram[crop_y1:crop_y2+1, crop_x1:crop_x2+1, :]
 
-                ## detect edge and text
-                neck_line = y2 - crop_y1
-                body_bound = int(body_bound * h) - crop_y1
-                crop_y = self.detect_edge_text(cropped, neck_line)
-                crop_y = min(crop_y, body_bound)
-                cropped = cropped[:crop_y, :, :]
+                    ## compute body bound
+                    body_bound = 1.0
+                    for j, other_bbox in enumerate(bbs):
+                        if i == j:
+                            continue
+                        if bbox.y2 < other_bbox.y1:
+                            center = (bbox.x1  + bbox.x2) / 2
+                            crop_x1 = (center - bbox.x2 + bbox.x1)
+                            crop_x2 = (center + bbox.x2 - bbox.x1)
+                            if other_bbox.x1 < crop_x2 or other_bbox.x2 > crop_x1:
+                                body_bound = other_bbox.y1
 
-                images.append(cropped)
-        else:
-            images = [
-                frame[int(bbox.y1 * h):int(bbox.y2 * h),
-                      int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bboxes
-            ]
+                    ## detect edge and text
+                    neck_line = y2 - crop_y1
+                    body_bound = int(body_bound * h) - crop_y1
+                    crop_y = self.detect_edge_text(cropped, neck_line)
+                    crop_y = min(crop_y, body_bound)
+                    cropped = cropped[:crop_y, :, :]
+
+                    images.append(cropped)
+            else:
+                images.extend([
+                    fram[int(bbox.y1 * h):int(bbox.y2 * h),
+                          int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bbs
+                ])
 
         tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images])
         var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)
         scores, features = self.model(var)
 
-        predicted_attributes = np.zeros((len(images), len(scores)), dtype=np.int32)
-        for i, attrib_score in enumerate(scores):
-            _, predicted = torch.max(attrib_score, 1)
-            predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
+        all_att = []
+        for k in range(len(frame)):
+            (idx, n) = counts[k]
+            predicted_attributes = np.zeros((n, len(scores)), dtype=np.int32)
+            for i, attrib_score in enumerate(scores):
+                _, predicted = torch.max(attrib_score[idx:idx+n, :], 1)
+                predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
+            all_att.append(pickle.dumps(predicted_attributes))
 
-        return pickle.dumps(predicted_attributes)
+        return all_att
 
 
 def parse_clothing(s, _proto):
