@@ -300,17 +300,26 @@ class Pipeline(ABC):
             ])
 
     def parse_output(self):
-        if len(self._output_ops.keys()) == 1:
-            col_name = list(self._output_ops.keys())[0]
+        output_cols = list(self._output_ops.keys())
+        if len(output_cols) == 1:
             return [
                 ScannerColumn(
-                    self._db.table(t).column(col_name),
+                    self._db.table(t).column(output_cols[0]),
                     self.parser_fn() if self.parser_fn is not None else None)
                 if self.committed(t) else None
                 for t in self._sink.args
             ]
         else:
-            raise Exception("Multiple outputs, no default can be returned")
+            return [
+                {
+                    col_name: ScannerColumn(
+                        self._db.table(t).column(col_name),
+                    self.parser_fn[col_name]() if self.parser_fn is not None else None)
+                    for col_name in output_cols
+                } 
+                if self.committed(t) else None
+                for t in self._sink.args
+            ]
 
     def build_pipeline(self):
         raise NotImplemented

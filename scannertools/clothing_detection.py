@@ -1,7 +1,7 @@
 from .prelude import Pipeline, try_import
 from scannerpy import Kernel, FrameType, DeviceType
 from scannerpy.stdlib.util import download_temp_file
-from scannerpy.stdlib import readers
+from scannerpy.stdlib import readers, writers
 import scannerpy
 import pickle
 import sys
@@ -90,12 +90,17 @@ class Clothing:
     def __init__(self, predictions):
         self._predictions = predictions
 
+    def to_dict(self):
+        return {
+            attribute['key']: {v: k for k, v in attribute['values'].items()}[prediction]
+            for prediction, attribute in zip(self._predictions, ATTRIBUTES)
+        }
+
     def __str__(self):
-        pieces = []
-        for prediction, attribute in zip(self._predictions, ATTRIBUTES):
-            reverse_map = {v: k for k, v in attribute['values'].items()}
-            pieces.append('{}: {}'.format(attribute['key'], reverse_map[prediction]))
-        return '\n'.join(pieces)
+        return '\n'.join([
+            '{}: {}'.format(k, v)
+            for k, v in self.to_dict().items()
+        ])
 
 
 class TorchKernel(Kernel):
@@ -144,18 +149,8 @@ class TorchKernel(Kernel):
         raise NotImplementedError
 
 
-@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=64)
-@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=64)
-class DetectClothing(TorchKernel):
-    def __init__(self, config):
-        from torchvision import transforms
-        TorchKernel.__init__(self, config)
-
-        self.transform = transforms.Compose([
-            transforms.Resize((299, 299)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
+@scannerpy.register_python_op(batch=64)
+class PrepareClothingBbox(Kernel):
 
     def detect_edge_text(self, img, start_y=40):
         import cv2
@@ -196,6 +191,78 @@ class DetectClothing(TorchKernel):
         return H
 
     def execute(self, frame: Sequence[FrameType], bboxes: Sequence[bytes]) -> Sequence[bytes]:
+        h, w = frame[0].shape[:2]
+        all_new_bbs = []
+        for fram, bbs in zip(frame, bboxes):
+            bbs = readers.bboxes(bbs, self.protobufs)
+            new_bbs = []
+            for i, bbox in enumerate(bbs):
+                x1 = int(bbox.x1 * w)
+                y1 = int(bbox.y1 * h)
+                x2 = int(bbox.x2 * w)
+                y2 = int(bbox.y2 * h)
+
+                ## set crop window
+                crop_w = (x2 - x1) * 2
+                crop_h = crop_w * 2
+                X1 = int((x1 + x2) / 2 - crop_w / 2)
+                X2 = X1 + crop_w
+                Y1 = int((y1 + y2) / 2 - crop_h / 3)
+                Y2 = Y1 + crop_h
+
+                ## adjust box size by image boundary
+                crop_x1 = max(0, X1)
+                crop_x2 = min(w-1, X2)
+                crop_y1 = max(0, Y1)
+                crop_y2 = min(h-1, Y2)
+                cropped = fram[crop_y1:crop_y2+1, crop_x1:crop_x2+1, :]
+
+                ## compute body bound
+                body_bound = 1.0
+                for j, other_bbox in enumerate(bbs):
+                    if i == j:
+                        continue
+                    if bbox.y2 < other_bbox.y1:
+                        center = (bbox.x1  + bbox.x2) / 2
+                        crop_x1 = (center - bbox.x2 + bbox.x1)
+                        crop_x2 = (center + bbox.x2 - bbox.x1)
+                        if other_bbox.x1 < crop_x2 or other_bbox.x2 > crop_x1:
+                            body_bound = other_bbox.y1
+
+                ## detect edge and text
+                neck_line = y2 - crop_y1
+                body_bound = int(body_bound * h) - crop_y1
+                crop_y = self.detect_edge_text(cropped, neck_line)
+                crop_y = min(crop_y, body_bound)
+
+                # If we produce a malformed bbox then just use the original bbox.
+                if int(crop_x1) >= int(crop_x2) or int(crop_y1) >= int(crop_y):
+                    new_bbs.append(bbox)
+                else:
+                    new_bbs.append(self.protobufs.BoundingBox(
+                        x1=crop_x1/w,
+                        x2=crop_x2/w,
+                        y1=crop_y1/h,
+                        y2=crop_y/h))
+
+            all_new_bbs.append(writers.bboxes(new_bbs, self.protobufs))
+        return all_new_bbs
+            
+
+@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=64)
+@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=64)
+class DetectClothing(TorchKernel):
+    def __init__(self, config):
+        from torchvision import transforms
+        TorchKernel.__init__(self, config)
+
+        self.transform = transforms.Compose([
+            transforms.Resize((299, 299)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+
+    def execute(self, frame: Sequence[FrameType], bboxes: Sequence[bytes]) -> Sequence[bytes]:
         from PIL import Image
         from torch.autograd import Variable
         import torch
@@ -210,53 +277,10 @@ class DetectClothing(TorchKernel):
             if len(bboxes) == 0:
                 raise Exception("No bounding boxes")
 
-            if self.config.args['adjust_bboxes']:
-                for i, bbox in enumerate(bbs):
-                    x1 = int(bbox.x1 * w)
-                    y1 = int(bbox.y1 * h)
-                    x2 = int(bbox.x2 * w)
-                    y2 = int(bbox.y2 * h)
-
-                    ## set crop window
-                    crop_w = (x2 - x1) * 2
-                    crop_h = crop_w * 2
-                    X1 = int((x1 + x2) / 2 - crop_w / 2)
-                    X2 = X1 + crop_w
-                    Y1 = int((y1 + y2) / 2 - crop_h / 3)
-                    Y2 = Y1 + crop_h
-
-                    ## adjust box size by image boundary
-                    crop_x1 = max(0, X1)
-                    crop_x2 = min(w-1, X2)
-                    crop_y1 = max(0, Y1)
-                    crop_y2 = min(h-1, Y2)
-                    cropped = fram[crop_y1:crop_y2+1, crop_x1:crop_x2+1, :]
-
-                    ## compute body bound
-                    body_bound = 1.0
-                    for j, other_bbox in enumerate(bbs):
-                        if i == j:
-                            continue
-                        if bbox.y2 < other_bbox.y1:
-                            center = (bbox.x1  + bbox.x2) / 2
-                            crop_x1 = (center - bbox.x2 + bbox.x1)
-                            crop_x2 = (center + bbox.x2 - bbox.x1)
-                            if other_bbox.x1 < crop_x2 or other_bbox.x2 > crop_x1:
-                                body_bound = other_bbox.y1
-
-                    ## detect edge and text
-                    neck_line = y2 - crop_y1
-                    body_bound = int(body_bound * h) - crop_y1
-                    crop_y = self.detect_edge_text(cropped, neck_line)
-                    crop_y = min(crop_y, body_bound)
-                    cropped = cropped[:crop_y, :, :]
-
-                    images.append(cropped)
-            else:
-                images.extend([
-                    fram[int(bbox.y1 * h):int(bbox.y2 * h),
-                          int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bbs
-                ])
+            images.extend([
+                fram[int(bbox.y1 * h):int(bbox.y2 * h),
+                     int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bbs
+            ])
 
         tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images])
         var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)
@@ -281,7 +305,7 @@ def parse_clothing(s, _proto):
 
 class ClothingDetectionPipeline(Pipeline):
     job_suffix = 'clothing'
-    parser_fn = lambda _: parse_clothing
+    parser_fn = lambda: parse_clothing
     additional_sources = ['bboxes']
 
     def fetch_resources(self):
@@ -292,11 +316,14 @@ class ClothingDetectionPipeline(Pipeline):
         self._model_def_path = download_temp_file(MODEL_DEF_URL)
 
     def build_pipeline(self, adjust_bboxes=True):
+        new_bbs = PrepareClothingBbox(
+            frame=self._sources['frame_sampled'].op,
+            bboxes=self._sources['bboxes'].op)
         return {
             'clothing':
             getattr(self._db.ops, 'DetectClothing{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
                 frame=self._sources['frame_sampled'].op,
-                bboxes=self._sources['bboxes'].op,
+                bboxes=new_bbs,
                 model_path=self._model_path,
                 model_def_path=self._model_def_path,
                 model_key='best_model',
