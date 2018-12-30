@@ -110,10 +110,10 @@ class DetectHairStyle(TorchKernel):
         if self.config.args['adjust_bboxes']:
             images = []
             for i, bbox in enumerate(bboxes):
-                x1 = int(bbox.x1 * w)
-                y1 = int(bbox.y1 * h)
-                x2 = int(bbox.x2 * w)
-                y2 = int(bbox.y2 * h)
+                x1 = int(bbox.x1 * W)
+                y1 = int(bbox.y1 * H)
+                x2 = int(bbox.x2 * W)
+                y2 = int(bbox.y2 * H)
                 w = max(y2 - y1, x2 - x1) * 3 // 4
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                 x1 = cx - w if cx - w > 0 else 0
