@@ -11,7 +11,7 @@ class HistogramPipeline(Pipeline):
             'histogram':
             self._db.ops.Histogram(
                 frame=self._sources['frame'].op,
-                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU,
+                device=self._device,
                 batch=batch)
         }
 
@@ -29,7 +29,7 @@ class HSVHistogramPipeline(Pipeline):
             'histogram':
             self._db.ops.Histogram(
                 frame=hsv_frames,
-                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU,
+                device=self._device,
                 batch=batch)
         }
 
@@ -57,7 +57,7 @@ class OpticalFlowHistogramPipeline(Pipeline):
     def build_pipeline(self):
         flow = self._db.ops.OpticalFlow(
                 frame=self._sources['frame_sampled'].op,
-                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
+                device=self._device)
         return {
             'flow_hist':
             self._db.ops.FlowHistogram(

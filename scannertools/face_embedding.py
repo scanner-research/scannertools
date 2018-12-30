@@ -78,11 +78,11 @@ class FaceEmbeddingPipeline(Pipeline):
     def build_pipeline(self):
         return {
             'embeddings':
-            getattr(self._db.ops, 'EmbedFaces{}'.format('GPU' if self._db.has_gpu() else 'CPU'))(
+            getattr(self._db.ops, 'EmbedFaces{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
                 frame=self._sources['frame_sampled'].op,
                 bboxes=self._sources['bboxes'].op,
                 model_dir=self._model_dir,
-                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
+                device=self._device)
         }
 
 

@@ -300,26 +300,35 @@ class Pipeline(ABC):
             ])
 
     def parse_output(self):
-        if len(self._output_ops.keys()) == 1:
-            col_name = list(self._output_ops.keys())[0]
+        output_cols = list(self._output_ops.keys())
+        if len(output_cols) == 1:
             return [
                 ScannerColumn(
-                    self._db.table(t).column(col_name),
+                    self._db.table(t).column(output_cols[0]),
                     self.parser_fn() if self.parser_fn is not None else None)
                 if self.committed(t) else None
                 for t in self._sink.args
             ]
         else:
-            raise Exception("Multiple outputs, no default can be returned")
+            return [
+                {
+                    col_name: ScannerColumn(
+                        self._db.table(t).column(col_name),
+                    self.parser_fn[col_name]() if self.parser_fn is not None else None)
+                    for col_name in output_cols
+                } 
+                if self.committed(t) else None
+                for t in self._sink.args
+            ]
 
     def build_pipeline(self):
         raise NotImplemented
 
-    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, cpu_only=False, detach=False, megabatch=10000, cache=True):
+    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, device=DeviceType.CPU, detach=False, megabatch=10000, cache=True):
         self._custom_run_opts = {**self.run_opts, **run_opts}
         self._custom_opts = custom_opts
 
-        self._cpu_only = cpu_only or not self._db.has_gpu()
+        self._device = device
 
         self.fetch_resources()
 
@@ -344,7 +353,7 @@ class Pipeline(ABC):
 
     @classmethod
     def make_runner(cls):
-        def runner(db, run_opts={}, cache=True, detach=False, no_execute=False, cpu_only=False, megabatch=10000, **kwargs):
+        def runner(db, run_opts={}, cache=True, detach=False, no_execute=False, device=DeviceType.CPU, megabatch=10000, **kwargs):
             pipeline = cls(db)
 
             def method_arg_names(f):
@@ -384,7 +393,7 @@ class Pipeline(ABC):
                 output_args=output_args,
                 run_opts=run_opts,
                 custom_opts=custom_opts,
-                cpu_only=cpu_only,
+                device=device,
                 no_execute=no_execute,
                 megabatch=megabatch,
                 detach=detach,

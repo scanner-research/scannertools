@@ -1,12 +1,13 @@
 from .prelude import Pipeline, try_import
 from scannerpy import Kernel, FrameType, DeviceType
 from scannerpy.stdlib.util import download_temp_file
-from scannerpy.stdlib import readers
+from scannerpy.stdlib import readers, writers
 import scannerpy
 import pickle
 import sys
 import os
 import numpy as np
+from typing import Sequence
 
 MODEL_URL = 'https://storage.googleapis.com/esper/models/clothing/model_newsanchor.tar'
 MODEL_DEF_URL = 'https://raw.githubusercontent.com/Haotianz94/video-analysis/master/streetstyle-classifier/classifier/newsanchor_classifier_model.py'
@@ -89,12 +90,17 @@ class Clothing:
     def __init__(self, predictions):
         self._predictions = predictions
 
+    def to_dict(self):
+        return {
+            attribute['key']: {v: k for k, v in attribute['values'].items()}[prediction]
+            for prediction, attribute in zip(self._predictions, ATTRIBUTES)
+        }
+
     def __str__(self):
-        pieces = []
-        for prediction, attribute in zip(self._predictions, ATTRIBUTES):
-            reverse_map = {v: k for k, v in attribute['values'].items()}
-            pieces.append('{}: {}'.format(attribute['key'], reverse_map[prediction]))
-        return '\n'.join(pieces)
+        return '\n'.join([
+            '{}: {}'.format(k, v)
+            for k, v in self.to_dict().items()
+        ])
 
 
 class TorchKernel(Kernel):
@@ -106,13 +112,14 @@ class TorchKernel(Kernel):
         self.cpu_only = True
         visible_device_list = []
         for handle in config.devices:
-            if handle.type == DeviceType.GPU.value:
+            if int(handle.type) == DeviceType.GPU.value:
                 visible_device_list.append(handle.id)
                 self.cpu_only = False
 
         self.model = self.build_model()
-
+        
         if not self.cpu_only:
+            print('Using GPU: {}'.format(visible_device_list[0]))
             torch.cuda.set_device(visible_device_list[0])
             self.model = self.model.cuda()
 
@@ -142,17 +149,8 @@ class TorchKernel(Kernel):
         raise NotImplementedError
 
 
-@scannerpy.register_python_op()
-class DetectClothing(TorchKernel):
-    def __init__(self, config):
-        from torchvision import transforms
-        TorchKernel.__init__(self, config)
-
-        self.transform = transforms.Compose([
-            transforms.Resize((299, 299)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ])
+@scannerpy.register_python_op(batch=64)
+class PrepareClothingBbox(Kernel):
 
     def detect_edge_text(self, img, start_y=40):
         import cv2
@@ -192,19 +190,13 @@ class DetectClothing(TorchKernel):
                 return y
         return H
 
-    def execute(self, frame: FrameType, bboxes: bytes) -> bytes:
-        from PIL import Image
-        from torch.autograd import Variable
-        import torch
-
-        h, w = frame.shape[:2]
-        bboxes = readers.bboxes(bboxes, self.config.protobufs)
-        if len(bboxes) == 0:
-            return pickle.dumps([])
-
-        if self.config.args['adjust_bboxes']:
-            images = []
-            for i, bbox in enumerate(bboxes):
+    def execute(self, frame: Sequence[FrameType], bboxes: Sequence[bytes]) -> Sequence[bytes]:
+        h, w = frame[0].shape[:2]
+        all_new_bbs = []
+        for fram, bbs in zip(frame, bboxes):
+            bbs = readers.bboxes(bbs, self.protobufs)
+            new_bbs = []
+            for i, bbox in enumerate(bbs):
                 x1 = int(bbox.x1 * w)
                 y1 = int(bbox.y1 * h)
                 x2 = int(bbox.x2 * w)
@@ -223,11 +215,11 @@ class DetectClothing(TorchKernel):
                 crop_x2 = min(w-1, X2)
                 crop_y1 = max(0, Y1)
                 crop_y2 = min(h-1, Y2)
-                cropped = frame[crop_y1:crop_y2+1, crop_x1:crop_x2+1, :]
+                cropped = fram[crop_y1:crop_y2+1, crop_x1:crop_x2+1, :]
 
                 ## compute body bound
                 body_bound = 1.0
-                for j, other_bbox in enumerate(bboxes):
+                for j, other_bbox in enumerate(bbs):
                     if i == j:
                         continue
                     if bbox.y2 < other_bbox.y1:
@@ -242,25 +234,68 @@ class DetectClothing(TorchKernel):
                 body_bound = int(body_bound * h) - crop_y1
                 crop_y = self.detect_edge_text(cropped, neck_line)
                 crop_y = min(crop_y, body_bound)
-                cropped = cropped[:crop_y, :, :]
 
-                images.append(cropped)
-        else:
-            images = [
-                frame[int(bbox.y1 * h):int(bbox.y2 * h),
-                      int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bboxes
-            ]
+                # If we produce a malformed bbox then just use the original bbox.
+                if int(crop_x1) >= int(crop_x2) or int(crop_y1) >= int(crop_y):
+                    new_bbs.append(bbox)
+                else:
+                    new_bbs.append(self.protobufs.BoundingBox(
+                        x1=crop_x1/w,
+                        x2=crop_x2/w,
+                        y1=crop_y1/h,
+                        y2=crop_y/h))
+
+            all_new_bbs.append(writers.bboxes(new_bbs, self.protobufs))
+        return all_new_bbs
+            
+
+@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=64)
+@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=64)
+class DetectClothing(TorchKernel):
+    def __init__(self, config):
+        from torchvision import transforms
+        TorchKernel.__init__(self, config)
+
+        self.transform = transforms.Compose([
+            transforms.Resize((299, 299)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+
+    def execute(self, frame: Sequence[FrameType], bboxes: Sequence[bytes]) -> Sequence[bytes]:
+        from PIL import Image
+        from torch.autograd import Variable
+        import torch
+
+        h, w = frame[0].shape[:2]
+
+        counts = []
+        images = []
+        for i, (fram, bbs) in enumerate(zip(frame, bboxes)):
+            bbs = readers.bboxes(bbs, self.config.protobufs)
+            counts.append((counts[i - 1][0] + counts[i - 1][1] if i > 0 else 0, len(bbs)))
+            if len(bboxes) == 0:
+                raise Exception("No bounding boxes")
+
+            images.extend([
+                fram[int(bbox.y1 * h):int(bbox.y2 * h),
+                     int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bbs
+            ])
 
         tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images])
         var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)
         scores, features = self.model(var)
 
-        predicted_attributes = np.zeros((len(images), len(scores)), dtype=np.int32)
-        for i, attrib_score in enumerate(scores):
-            _, predicted = torch.max(attrib_score, 1)
-            predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
+        all_att = []
+        for k in range(len(frame)):
+            (idx, n) = counts[k]
+            predicted_attributes = np.zeros((n, len(scores)), dtype=np.int32)
+            for i, attrib_score in enumerate(scores):
+                _, predicted = torch.max(attrib_score[idx:idx+n, :], 1)
+                predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
+            all_att.append(pickle.dumps(predicted_attributes))
 
-        return pickle.dumps(predicted_attributes)
+        return all_att
 
 
 def parse_clothing(s, _proto):
@@ -270,9 +305,8 @@ def parse_clothing(s, _proto):
 
 class ClothingDetectionPipeline(Pipeline):
     job_suffix = 'clothing'
-    parser_fn = lambda _: parse_clothing
+    parser_fn = lambda: parse_clothing
     additional_sources = ['bboxes']
-    run_opts = {'pipeline_instances_per_node': 1}
 
     def fetch_resources(self):
         try_import('torch', __name__)
@@ -282,15 +316,19 @@ class ClothingDetectionPipeline(Pipeline):
         self._model_def_path = download_temp_file(MODEL_DEF_URL)
 
     def build_pipeline(self, adjust_bboxes=True):
+        new_bbs = PrepareClothingBbox(
+            frame=self._sources['frame_sampled'].op,
+            bboxes=self._sources['bboxes'].op)
         return {
             'clothing':
-            self._db.ops.DetectClothing(
+            getattr(self._db.ops, 'DetectClothing{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
                 frame=self._sources['frame_sampled'].op,
-                bboxes=self._sources['bboxes'].op,
+                bboxes=new_bbs,
                 model_path=self._model_path,
                 model_def_path=self._model_def_path,
                 model_key='best_model',
-                adjust_bboxes=adjust_bboxes)
+                adjust_bboxes=adjust_bboxes,
+                device=self._device)
         }
 
 
