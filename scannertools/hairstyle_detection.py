@@ -68,7 +68,7 @@ class DetectHairStyle(TorchKernel):
         from torch.autograd import Variable
         import torch
 
-        h, w = frame[0].shape[:2]
+        H, W = frame[0].shape[:2]
 
         counts = []
         images = []
@@ -78,16 +78,19 @@ class DetectHairStyle(TorchKernel):
             if len(bboxes) == 0:
                 raise Exception("No bounding boxes")
 
-            # for bbox in bbs:
-            #     # print(int(bbox.y1 * h), int(bbox.y2 * h),
-            #     #       int(bbox.x1 * w), int(bbox.x2 * w))
-            #     Image.fromarray(fram[int(bbox.y1 * h):int(bbox.y2 * h),
-            #                          int(bbox.x1 * w):int(bbox.x2 * w)])
-
-            images.extend([
-                fram[int(bbox.y1 * h):int(bbox.y2 * h),
-                     int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bbs
-            ])
+            for i, bbox in enumerate(bbs):
+                x1 = int(bbox.x1 * W)
+                y1 = int(bbox.y1 * H)
+                x2 = int(bbox.x2 * W)
+                y2 = int(bbox.y2 * H)
+                w = max(y2 - y1, x2 - x1) * 3 // 4
+                cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                x1 = cx - w if cx - w > 0 else 0
+                x2 = cx + w if cx + w < W else W
+                y1 = cy - w if cy - w > 0 else 0
+                y2 = cy + w if cy + w < H else H
+                cropped = fram[y1:y2, x1:x2, :]
+                images.append(cropped)
 
         all_scores = []
         for i in range(0, len(images), BATCH_SIZE):
