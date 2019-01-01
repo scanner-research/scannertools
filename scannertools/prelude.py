@@ -290,13 +290,6 @@ class Pipeline(ABC):
             source = v[0].scanner_source(self._db)
             sources[k] = BoundOp(op=source, args=[c.scanner_args(self._db) for c in v])
 
-        first_source = list(kwargs.items())[0][0]
-        num_elements = len(sources[first_source].args)
-        for k, op in sources.items():
-            if len(op.args) != num_elements:
-                raise Exception('Source {} had {} inputs, {} expected (from source {})'.format(
-                    k, len(op.args), num_elements, first_source))
-
         return sources
 
     def build_sink(self):
@@ -324,7 +317,7 @@ class Pipeline(ABC):
                         self._db.table(t).column(col_name),
                     self.parser_fn[col_name]() if self.parser_fn is not None else None)
                     for col_name in output_cols
-                } 
+                }
                 if self.committed(t) else None
                 for t in self._sink.args
             ]
