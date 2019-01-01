@@ -47,7 +47,7 @@ class HairStyle:
             pieces.append('{}: {}'.format(attribute['key'], reverse_map[prediction]))
         return '\n'.join(pieces)
 
-BATCH_SIZE = 10
+BATCH_SIZE = 2
 
 @scannerpy.register_python_op(name='DetectHairStyleCPU', device_type=DeviceType.CPU, batch=BATCH_SIZE)
 @scannerpy.register_python_op(name='DetectHairStyleGPU', device_type=DeviceType.GPU, batch=BATCH_SIZE)
@@ -122,7 +122,7 @@ def parse_hairstyle(s, _proto):
 
 class HairStyleDetectionPipeline(Pipeline):
     job_suffix = 'hairstyle'
-    parser_fn = lambda: parse_hairstyle
+    parser_fn = lambda _: parse_hairstyle
     additional_sources = ['bboxes']
 
     def fetch_resources(self):
