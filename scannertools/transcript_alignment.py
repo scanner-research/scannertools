@@ -20,9 +20,7 @@ import json
 import traceback
 import gentle
 
-###############################################
-# Help functions for fid, time, second transfer
-###############################################
+#----------Help functions for fid, time, second transfer----------
 def fid2second(fid, fps):
     second = 1. * fid / fps
     return second
@@ -34,9 +32,7 @@ def second2time(second, sep=','):
     h, m, s, ms = int(second) // 3600, int(second % 3600) // 60, int(second) % 60, int((second - int(second)) * 1000)
     return '{:02d}:{:02d}:{:02d}{:s}{:03d}'.format(h, m, s, sep, ms)
 
-################################################
-# Forced transcript-audio alignment using gentle
-################################################
+#---------Forced transcript-audio alignment using gentle----------
 class TranscriptAligner():
     def __init__(self, win_size=300, seg_length=60, max_misalign=10, num_thread=1, estimate=False,
                  transcript_path=None, media_path=None, align_dir=None):
@@ -372,9 +368,7 @@ class TranscriptAligner():
 #             TranscriptAligner.dump_aligned_transcript(align_word_list, output_path)
         return {'word_missing': 1 - 1. * num_word_aligned / self.num_words}    
 
-###########################################
-# Modified methods for scanner pipeline
-###########################################
+#----------Modified methods for scanner pipeline---------------
     def run_segment_scanner(self, audio_pkg, caption_pkg):
         def extract_transcript(caption, start, end, offset_to_time=False):
             if offset_to_time:
@@ -571,10 +565,10 @@ class TranscriptAligner():
             srt_idx += 1
         outfile.close()  
         
-################################################
-# Scanner kernel for transcript alignment
-################################################
+#-------------Scanner kernel for transcript alignment--------------
+#### First run #### 
 @scannerpy.register_python_op(name='AlignTranscript', stencil=[-1,0,1])
+#### Second run ####
 # @scannerpy.register_python_op(name='AlignTranscript', stencil=[-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7])
 class AlignTranscript(Kernel):
     def __init__(self, config):
@@ -596,11 +590,13 @@ class AlignTranscript(Kernel):
         return pickle.dumps(result_seg)
 
 
-################################################
-# Scanner pipeline for transcript alignment
-################################################
+#------- Scanner pipeline for transcript alignment--------------
 class AlignTranscriptPipeline(Pipeline):
-    job_suffix = 'align_transcript2'
+    #### First run #### 
+    job_suffix = 'align_transcript'
+    #### Second run #### 
+    # job_suffix = 'align_transcript2'
+
     base_sources = ['audio', 'captions']
     run_opts = {'pipeline_instances_per_node': 8, 'io_packet_size': 4, 'work_packet_size': 4, 'checkpoint_frequency': 5}
     custom_opts = ['align_opts']
@@ -611,7 +607,10 @@ class AlignTranscriptPipeline(Pipeline):
     
     def build_pipeline(self):
         return {
-            'align_transcript2':
+            #### First run #### 
+            'align_transcript':
+            #### Second run #### 
+            # 'align_transcript2':
             self._db.ops.AlignTranscript(
                 audio=self._sources['audio'].op,
                 captions=self._sources['captions'].op,
