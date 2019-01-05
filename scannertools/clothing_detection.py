@@ -122,6 +122,8 @@ class TorchKernel(Kernel):
             print('Using GPU: {}'.format(visible_device_list[0]))
             torch.cuda.set_device(visible_device_list[0])
             self.model = self.model.cuda()
+        else:
+            print('Using CPU')
 
         # Not sure if this is necessary? Haotian had it in his code
         self.model.eval()
@@ -149,7 +151,7 @@ class TorchKernel(Kernel):
         raise NotImplementedError
 
 
-@scannerpy.register_python_op(batch=64)
+@scannerpy.register_python_op(batch=20)
 class PrepareClothingBbox(Kernel):
 
     def detect_edge_text(self, img, start_y=40):
@@ -235,8 +237,14 @@ class PrepareClothingBbox(Kernel):
                 crop_y = self.detect_edge_text(cropped, neck_line)
                 crop_y = min(crop_y, body_bound)
 
+                def inbound(coord, limit):
+                    return 0 <= int(coord) and int(coord) < limit
+
                 # If we produce a malformed bbox then just use the original bbox.
-                if int(crop_x1) >= int(crop_x2) or int(crop_y1) >= int(crop_y):
+                if abs(crop_x1 - crop_x2) < 20 or abs(crop_y1 - crop_y) < 20 \
+                   or crop_x1 >= crop_x2 or crop_y1 >= crop_y \
+                   or not inbound(crop_x1, w) or not inbound(crop_x2, w) \
+                   or not inbound(crop_y1, h) or not inbound(crop_y, h):
                     new_bbs.append(bbox)
                 else:
                     new_bbs.append(self.protobufs.BoundingBox(
@@ -249,8 +257,8 @@ class PrepareClothingBbox(Kernel):
         return all_new_bbs
             
 
-@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=64)
-@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=64)
+@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=10)
+@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=10)
 class DetectClothing(TorchKernel):
     def __init__(self, config):
         from torchvision import transforms
@@ -277,10 +285,17 @@ class DetectClothing(TorchKernel):
             if len(bboxes) == 0:
                 raise Exception("No bounding boxes")
 
+            for bbox in bbs:
+                # print(int(bbox.y1 * h), int(bbox.y2 * h),
+                #       int(bbox.x1 * w), int(bbox.x2 * w))
+                Image.fromarray(fram[int(bbox.y1 * h):int(bbox.y2 * h),
+                                     int(bbox.x1 * w):int(bbox.x2 * w)])
+
             images.extend([
                 fram[int(bbox.y1 * h):int(bbox.y2 * h),
                      int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bbs
             ])
+
 
         tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images])
         var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)

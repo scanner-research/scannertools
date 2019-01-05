@@ -7,6 +7,8 @@ import pickle
 import sys
 import os
 import numpy as np
+from .clothing_detection import TorchKernel
+from typing import Sequence
 
 MODEL_URL = 'https://storage.googleapis.com/esper/models/clothing/model_hairstyle.tar'
 MODEL_DEF_URL = 'https://raw.githubusercontent.com/Haotianz94/video-analysis/master/streetstyle-classifier/classifier/model_hairstyle.py'
@@ -32,6 +34,12 @@ class HairStyle:
     def __init__(self, predictions):
         self._predictions = predictions
 
+    def to_dict(self):
+        return {
+            attribute['key']: {v: k for k, v in attribute['values'].items()}[prediction]
+            for prediction, attribute in zip(self._predictions, ATTRIBUTES)
+        }
+
     def __str__(self):
         pieces = []
         for prediction, attribute in zip(self._predictions, ATTRIBUTES):
@@ -39,53 +47,10 @@ class HairStyle:
             pieces.append('{}: {}'.format(attribute['key'], reverse_map[prediction]))
         return '\n'.join(pieces)
 
+BATCH_SIZE = 2
 
-class TorchKernel(Kernel):
-    def __init__(self, config):
-        import torch
-
-        self.config = config
-
-        self.cpu_only = True
-        visible_device_list = []
-        for handle in config.devices:
-            if handle.type == DeviceType.GPU.value:
-                visible_device_list.append(handle.id)
-                self.cpu_only = False
-
-        self.model = self.build_model()
-
-        if not self.cpu_only:
-            torch.cuda.set_device(visible_device_list[0])
-            self.model = self.model.cuda()
-
-        # Not sure if this is necessary? Haotian had it in his code
-        self.model.eval()
-
-    def images_to_tensor(self, images):
-        import torch
-
-        shape = images[0].shape
-        images_tensor = torch.Tensor(len(images), shape[0], shape[1], shape[2])
-        for i in range(len(images)):
-            images_tensor[i] = images[i]
-        return images_tensor
-
-    def build_model(self):
-        import torch
-
-        sys.path.insert(0, os.path.split(self.config.args['model_def_path'])[0])
-        kwargs = {'map_location': lambda storage, location: storage} if self.cpu_only else {}
-        return torch.load(self.config.args['model_path'], **kwargs)[self.config.args['model_key']]
-
-    def close(self):
-        del self.model
-
-    def execute(self):
-        raise NotImplementedError
-
-
-@scannerpy.register_python_op()
+@scannerpy.register_python_op(name='DetectHairStyleCPU', device_type=DeviceType.CPU, batch=BATCH_SIZE)
+@scannerpy.register_python_op(name='DetectHairStyleGPU', device_type=DeviceType.GPU, batch=BATCH_SIZE)
 class DetectHairStyle(TorchKernel):
     def __init__(self, config):
         from torchvision import transforms
@@ -97,19 +62,23 @@ class DetectHairStyle(TorchKernel):
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-    def execute(self, frame: FrameType, bboxes: bytes) -> bytes:
+
+    def execute(self, frame: Sequence[FrameType], bboxes: Sequence[bytes]) -> Sequence[bytes]:
         from PIL import Image
         from torch.autograd import Variable
         import torch
 
-        H, W = frame.shape[:2]
-        bboxes = readers.bboxes(bboxes, self.config.protobufs)
-        if len(bboxes) == 0:
-            return pickle.dumps([])
+        H, W = frame[0].shape[:2]
 
-        if self.config.args['adjust_bboxes']:
-            images = []
-            for i, bbox in enumerate(bboxes):
+        counts = []
+        images = []
+        for i, (fram, bbs) in enumerate(zip(frame, bboxes)):
+            bbs = readers.bboxes(bbs, self.config.protobufs)
+            counts.append((counts[i - 1][0] + counts[i - 1][1] if i > 0 else 0, len(bbs)))
+            if len(bboxes) == 0:
+                raise Exception("No bounding boxes")
+
+            for i, bbox in enumerate(bbs):
                 x1 = int(bbox.x1 * W)
                 y1 = int(bbox.y1 * H)
                 x2 = int(bbox.x2 * W)
@@ -120,24 +89,30 @@ class DetectHairStyle(TorchKernel):
                 x2 = cx + w if cx + w < W else W
                 y1 = cy - w if cy - w > 0 else 0
                 y2 = cy + w if cy + w < H else H
-                cropped = frame[y1:y2, x1:x2, :]
+                cropped = fram[y1:y2, x1:x2, :]
                 images.append(cropped)
-        else:
-            images = [
-                frame[int(bbox.y1 * h):int(bbox.y2 * h),
-                      int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bboxes
-            ]
 
-        tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images])
-        var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)
-        scores, features = self.model(var)
+        all_scores = []
+        for i in range(0, len(images), BATCH_SIZE):
+            tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images[i:i+BATCH_SIZE]])
+            var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)
+            all_scores.append(self.model(var))
 
-        predicted_attributes = np.zeros((len(images), len(scores)), dtype=np.int32)
-        for i, attrib_score in enumerate(scores):
-            _, predicted = torch.max(attrib_score, 1)
-            predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
+        scores = [
+            torch.cat([scores[i] for scores in all_scores], dim=0)
+            for i in range(len(all_scores[0]))
+        ]
 
-        return pickle.dumps(predicted_attributes)
+        all_att = []
+        for k in range(len(frame)):
+            (idx, n) = counts[k]
+            predicted_attributes = np.zeros((n, len(scores)), dtype=np.int32)
+            for i, attrib_score in enumerate(scores):
+                _, predicted = torch.max(attrib_score[idx:idx+n, :], 1)
+                predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
+            all_att.append(pickle.dumps(predicted_attributes))
+
+        return all_att
 
 
 def parse_hairstyle(s, _proto):
@@ -149,7 +124,6 @@ class HairStyleDetectionPipeline(Pipeline):
     job_suffix = 'hairstyle'
     parser_fn = lambda _: parse_hairstyle
     additional_sources = ['bboxes']
-    run_opts = {'pipeline_instances_per_node': 1}
 
     def fetch_resources(self):
         try_import('torch', __name__)
@@ -167,7 +141,8 @@ class HairStyleDetectionPipeline(Pipeline):
                 model_path=self._model_path,
                 model_def_path=self._model_def_path,
                 model_key='best_model',
-                adjust_bboxes=adjust_bboxes)
+                adjust_bboxes=adjust_bboxes,
+                device=self._device)
         }
 
 

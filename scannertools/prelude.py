@@ -255,7 +255,8 @@ class Pipeline(ABC):
             map_[self._sink.op] = self._sink.args[i]
             return Job(op_args=map_)
         jobs = par_for(make_job, list(range(len(self._sink.args))), workers=8, progress=False)
-        return [j for j in jobs if j is not None]
+        output = tuple(zip(*[(i, j) for i, j in enumerate(jobs) if j is not None]))
+        return ([], []) if output == () else output
 
     def committed(self, output):
         return self._db.has_table(output) and self._db.table(output).committed()
@@ -316,7 +317,7 @@ class Pipeline(ABC):
                         self._db.table(t).column(col_name),
                     self.parser_fn[col_name]() if self.parser_fn is not None else None)
                     for col_name in output_cols
-                } 
+                }
                 if self.committed(t) else None
                 for t in self._sink.args
             ]
@@ -324,7 +325,7 @@ class Pipeline(ABC):
     def build_pipeline(self):
         raise NotImplemented
 
-    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, device=DeviceType.CPU, detach=False, megabatch=10000, cache=True):
+    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, device=DeviceType.CPU, detach=False, megabatch=25000, cache=True):
         self._custom_run_opts = {**self.run_opts, **run_opts}
         self._custom_opts = custom_opts
 
@@ -338,7 +339,7 @@ class Pipeline(ABC):
 
         self._sink = self.build_sink(**sink_args)
 
-        jobs = self._build_jobs(cache)
+        _, jobs = self._build_jobs(cache)
 
         if not no_execute and len(jobs) > 0:
             print('Executing {} jobs'.format(len(jobs)))
@@ -353,7 +354,7 @@ class Pipeline(ABC):
 
     @classmethod
     def make_runner(cls):
-        def runner(db, run_opts={}, cache=True, detach=False, no_execute=False, device=DeviceType.CPU, megabatch=10000, **kwargs):
+        def runner(db, run_opts={}, cache=True, detach=False, no_execute=False, device=DeviceType.CPU, megabatch=25000, **kwargs):
             pipeline = cls(db)
 
             def method_arg_names(f):
