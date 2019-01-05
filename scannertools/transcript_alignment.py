@@ -574,8 +574,8 @@ class TranscriptAligner():
 ################################################
 # Scanner kernel for transcript alignment
 ################################################
-# @scannerpy.register_python_op(name='AlignTranscript', stencil=[-1,0,1])
-@scannerpy.register_python_op(name='AlignTranscript', stencil=[-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7])
+@scannerpy.register_python_op(name='AlignTranscript', stencil=[-1,0,1])
+# @scannerpy.register_python_op(name='AlignTranscript', stencil=[-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7])
 class AlignTranscript(Kernel):
     def __init__(self, config):
         win_size = config.args['win_size']
