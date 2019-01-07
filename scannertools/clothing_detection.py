@@ -92,15 +92,13 @@ class Clothing:
 
     def to_dict(self):
         return {
-            attribute['key']: {v: k for k, v in attribute['values'].items()}[prediction]
+            attribute['key']: {v: k
+                               for k, v in attribute['values'].items()}[prediction]
             for prediction, attribute in zip(self._predictions, ATTRIBUTES)
         }
 
     def __str__(self):
-        return '\n'.join([
-            '{}: {}'.format(k, v)
-            for k, v in self.to_dict().items()
-        ])
+        return '\n'.join(['{}: {}'.format(k, v) for k, v in self.to_dict().items()])
 
 
 class TorchKernel(Kernel):
@@ -117,7 +115,7 @@ class TorchKernel(Kernel):
                 self.cpu_only = False
 
         self.model = self.build_model()
-        
+
         if not self.cpu_only:
             print('Using GPU: {}'.format(visible_device_list[0]))
             torch.cuda.set_device(visible_device_list[0])
@@ -153,7 +151,6 @@ class TorchKernel(Kernel):
 
 @scannerpy.register_python_op(batch=20)
 class PrepareClothingBbox(Kernel):
-
     def detect_edge_text(self, img, start_y=40):
         import cv2
         edges = cv2.Canny(img, 80, 80)
@@ -178,9 +175,9 @@ class PrepareClothingBbox(Kernel):
                 grad_horiz = False
                 neighbor = [-2, -1, 1, 2]
                 for i in neighbor:
-                    if x+i < 0 or x+i > W-1:
+                    if x + i < 0 or x + i > W - 1:
                         continue
-                    if np.fabs(img_bright[y, x+i] - img_bright[y, x]) > CONTRAST_THRESH:
+                    if np.fabs(img_bright[y, x + i] - img_bright[y, x]) > CONTRAST_THRESH:
                         grad_horiz = True
                         break
                 if grad_horiz:
@@ -214,10 +211,10 @@ class PrepareClothingBbox(Kernel):
 
                 ## adjust box size by image boundary
                 crop_x1 = max(0, X1)
-                crop_x2 = min(w-1, X2)
+                crop_x2 = min(w - 1, X2)
                 crop_y1 = max(0, Y1)
-                crop_y2 = min(h-1, Y2)
-                cropped = fram[crop_y1:crop_y2+1, crop_x1:crop_x2+1, :]
+                crop_y2 = min(h - 1, Y2)
+                cropped = fram[crop_y1:crop_y2 + 1, crop_x1:crop_x2 + 1, :]
 
                 ## compute body bound
                 body_bound = 1.0
@@ -225,7 +222,7 @@ class PrepareClothingBbox(Kernel):
                     if i == j:
                         continue
                     if bbox.y2 < other_bbox.y1:
-                        center = (bbox.x1  + bbox.x2) / 2
+                        center = (bbox.x1 + bbox.x2) / 2
                         crop_x1 = (center - bbox.x2 + bbox.x1)
                         crop_x2 = (center + bbox.x2 - bbox.x1)
                         if other_bbox.x1 < crop_x2 or other_bbox.x2 > crop_x1:
@@ -247,18 +244,16 @@ class PrepareClothingBbox(Kernel):
                    or not inbound(crop_y1, h) or not inbound(crop_y, h):
                     new_bbs.append(bbox)
                 else:
-                    new_bbs.append(self.protobufs.BoundingBox(
-                        x1=crop_x1/w,
-                        x2=crop_x2/w,
-                        y1=crop_y1/h,
-                        y2=crop_y/h))
+                    new_bbs.append(
+                        self.protobufs.BoundingBox(
+                            x1=crop_x1 / w, x2=crop_x2 / w, y1=crop_y1 / h, y2=crop_y / h))
 
             all_new_bbs.append(writers.bboxes(new_bbs, self.protobufs))
         return all_new_bbs
-            
 
-@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=10)
-@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=10)
+
+@scannerpy.register_python_op(name='DetectClothingCPU', device_type=DeviceType.CPU, batch=2)
+@scannerpy.register_python_op(name='DetectClothingGPU', device_type=DeviceType.GPU, batch=2)
 class DetectClothing(TorchKernel):
     def __init__(self, config):
         from torchvision import transforms
@@ -296,7 +291,6 @@ class DetectClothing(TorchKernel):
                      int(bbox.x1 * w):int(bbox.x2 * w)] for bbox in bbs
             ])
 
-
         tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images])
         var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)
         scores, features = self.model(var)
@@ -306,7 +300,7 @@ class DetectClothing(TorchKernel):
             (idx, n) = counts[k]
             predicted_attributes = np.zeros((n, len(scores)), dtype=np.int32)
             for i, attrib_score in enumerate(scores):
-                _, predicted = torch.max(attrib_score[idx:idx+n, :], 1)
+                _, predicted = torch.max(attrib_score[idx:idx + n, :], 1)
                 predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
             all_att.append(pickle.dumps(predicted_attributes))
 
@@ -318,8 +312,21 @@ def parse_clothing(s, _proto):
     return [Clothing(predictions[i, :]) for i in range(len(predictions))]
 
 
+class ClothingBboxesPipeline(Pipeline):
+    job_suffix = 'clothes_bboxes'
+    parser_fn = lambda _: readers.bboxes
+    additional_sources = ['bboxes']
+
+    def build_pipeline(self):
+        return {
+            'bboxes':
+            self._db.ops.PrepareClothingBbox(
+                frame=self._sources['frame_sampled'].op, bboxes=self._sources['bboxes'].op)
+        }
+
+
 class ClothingDetectionPipeline(Pipeline):
-    job_suffix = 'clothing'
+    job_suffix = 'clothes'
     parser_fn = lambda: parse_clothing
     additional_sources = ['bboxes']
 
@@ -332,19 +339,20 @@ class ClothingDetectionPipeline(Pipeline):
 
     def build_pipeline(self, adjust_bboxes=True):
         new_bbs = PrepareClothingBbox(
-            frame=self._sources['frame_sampled'].op,
-            bboxes=self._sources['bboxes'].op)
+            frame=self._sources['frame_sampled'].op, bboxes=self._sources['bboxes'].op)
         return {
             'clothing':
-            getattr(self._db.ops, 'DetectClothing{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
-                frame=self._sources['frame_sampled'].op,
-                bboxes=new_bbs,
-                model_path=self._model_path,
-                model_def_path=self._model_def_path,
-                model_key='best_model',
-                adjust_bboxes=adjust_bboxes,
-                device=self._device)
+            getattr(self._db.ops,
+                    'DetectClothing{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
+                        frame=self._sources['frame_sampled'].op,
+                        bboxes=new_bbs,
+                        model_path=self._model_path,
+                        model_def_path=self._model_def_path,
+                        model_key='best_model',
+                        adjust_bboxes=adjust_bboxes,
+                        device=self._device)
         }
 
 
+detect_clothing_bboxes = ClothingBboxesPipeline.make_runner()
 detect_clothing = ClothingDetectionPipeline.make_runner()
