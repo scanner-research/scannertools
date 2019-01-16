@@ -36,7 +36,8 @@ class HairStyle:
 
     def to_dict(self):
         return {
-            attribute['key']: {v: k for k, v in attribute['values'].items()}[prediction]
+            attribute['key']: {v: k
+                               for k, v in attribute['values'].items()}[prediction]
             for prediction, attribute in zip(self._predictions, ATTRIBUTES)
         }
 
@@ -47,9 +48,12 @@ class HairStyle:
             pieces.append('{}: {}'.format(attribute['key'], reverse_map[prediction]))
         return '\n'.join(pieces)
 
+
 BATCH_SIZE = 2
 
-@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=BATCH_SIZE)
+
+@scannerpy.register_python_op(
+    device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=BATCH_SIZE)
 class DetectHairStyle(TorchKernel):
     def __init__(self, config):
         from torchvision import transforms
@@ -60,7 +64,6 @@ class DetectHairStyle(TorchKernel):
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
-
 
     def execute(self, frame: Sequence[FrameType], bboxes: Sequence[bytes]) -> Sequence[bytes]:
         from PIL import Image
@@ -93,7 +96,8 @@ class DetectHairStyle(TorchKernel):
 
         all_scores = []
         for i in range(0, len(images), BATCH_SIZE):
-            tensor = self.images_to_tensor([self.transform(Image.fromarray(img)) for img in images[i:i+BATCH_SIZE]])
+            tensor = self.images_to_tensor(
+                [self.transform(Image.fromarray(img)) for img in images[i:i + BATCH_SIZE]])
             var = Variable(tensor if self.cpu_only else tensor.cuda(), requires_grad=False)
             all_scores.append(self.model(var))
 
@@ -107,7 +111,7 @@ class DetectHairStyle(TorchKernel):
             (idx, n) = counts[k]
             predicted_attributes = np.zeros((n, len(scores)), dtype=np.int32)
             for i, attrib_score in enumerate(scores):
-                _, predicted = torch.max(attrib_score[idx:idx+n, :], 1)
+                _, predicted = torch.max(attrib_score[idx:idx + n, :], 1)
                 predicted_attributes[:, i] = predicted.cpu().data.numpy().astype(np.int32)
             all_att.append(pickle.dumps(predicted_attributes))
 

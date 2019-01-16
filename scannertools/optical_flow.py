@@ -19,9 +19,7 @@ class OpticalFlowPipeline(Pipeline):
     def build_pipeline(self):
         return {
             'flow':
-            self._db.ops.OpticalFlow(
-                frame=self._sources['frame_sampled'].op,
-                device=self._device)
+            self._db.ops.OpticalFlow(frame=self._sources['frame_sampled'].op, device=self._device)
         }
 
 

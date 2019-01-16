@@ -195,10 +195,9 @@ def draw_bounding_box_on_image(image,
                                       ymax * im_height)
     else:
         (left, right, top, bottom) = (xmin, xmax, ymin, ymax)
-    draw.line(
-        [(left, top), (left, bottom), (right, bottom), (right, top), (left, top)],
-        width=thickness,
-        fill=color)
+    draw.line([(left, top), (left, bottom), (right, bottom), (right, top), (left, top)],
+              width=thickness,
+              fill=color)
     try:
         font = ImageFont.truetype('arial.ttf', 24)
     except IOError:
@@ -219,14 +218,13 @@ def draw_bounding_box_on_image(image,
     for display_str in display_str_list[::-1]:
         text_width, text_height = font.getsize(display_str)
         margin = np.ceil(0.05 * text_height)
-        draw.rectangle(
-            [(left, text_bottom - text_height - 2 * margin), (left + text_width, text_bottom)],
-            fill=color)
-        draw.text(
-            (left + margin, text_bottom - text_height - margin),
-            display_str,
-            fill='black',
-            font=font)
+        draw.rectangle([(left, text_bottom - text_height - 2 * margin),
+                        (left + text_width, text_bottom)],
+                       fill=color)
+        draw.text((left + margin, text_bottom - text_height - margin),
+                  display_str,
+                  fill='black',
+                  font=font)
         text_bottom -= text_height - 2 * margin
 
 
@@ -377,11 +375,10 @@ def draw_keypoints_on_image(image,
         keypoints_x = tuple([im_width * x for x in keypoints_x])
         keypoints_y = tuple([im_height * y for y in keypoints_y])
     for keypoint_x, keypoint_y in zip(keypoints_x, keypoints_y):
-        draw.ellipse(
-            [(keypoint_x - radius, keypoint_y - radius),
-             (keypoint_x + radius, keypoint_y + radius)],
-            outline=color,
-            fill=color)
+        draw.ellipse([(keypoint_x - radius, keypoint_y - radius),
+                      (keypoint_x + radius, keypoint_y + radius)],
+                     outline=color,
+                     fill=color)
 
 
 def draw_mask_on_image_array(image, mask, color='red', alpha=0.7):

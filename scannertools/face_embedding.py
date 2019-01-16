@@ -35,7 +35,8 @@ class EmbedFaces(TensorFlowKernel):
 
                     self.images_placeholder = tf.get_default_graph().get_tensor_by_name('input:0')
                     self.embeddings = tf.get_default_graph().get_tensor_by_name('embeddings:0')
-                    self.phase_train_placeholder = tf.get_default_graph().get_tensor_by_name('phase_train:0')
+                    self.phase_train_placeholder = tf.get_default_graph().get_tensor_by_name(
+                        'phase_train:0')
             print('Model loaded!')
 
         [h, w] = frame.shape[:2]
@@ -45,7 +46,7 @@ class EmbedFaces(TensorFlowKernel):
         outputs = b''
         for bbox in bboxes:
             # NOTE: if using output of mtcnn, not-normalized, so removing de-normalization factors here
-            face_img = frame[int(bbox.y1*h):int(bbox.y2*h), int(bbox.x1*w):int(bbox.x2*w)]
+            face_img = frame[int(bbox.y1 * h):int(bbox.y2 * h), int(bbox.x1 * w):int(bbox.x2 * w)]
             [fh, fw] = face_img.shape[:2]
             if fh == 0 or fw == 0:
                 outputs += np.zeros(128, dtype=np.float32).tobytes()

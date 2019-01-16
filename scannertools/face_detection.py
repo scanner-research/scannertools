@@ -80,7 +80,8 @@ class FaceDetectionPipeline(Pipeline):
         return {
             'bboxes':
             self._db.ops.MTCNNDetectFaces(
-                frame=self._sources['frame_sampled'].op, model_dir=os.path.dirname(align.__file__),
+                frame=self._sources['frame_sampled'].op,
+                model_dir=os.path.dirname(align.__file__),
                 device=self._device)
         }
 

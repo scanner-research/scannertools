@@ -4,10 +4,13 @@ from scannerpy import FrameType
 import pickle
 
 import json
+
+
 @scannerpy.register_python_op('PrintCap')
 def print_cap(config, captions: bytes) -> bytes:
     print(json.loads(captions.decode('utf-8')))
     return b' '
+
 
 class PrintCaptionsPipeline(Pipeline):
     job_suffix = 'printcap'
@@ -16,9 +19,7 @@ class PrintCaptionsPipeline(Pipeline):
     parser_fn = lambda _: lambda buf, _: ()
 
     def build_pipeline(self):
-        return {
-            'cap': self._db.ops.PrintCap(captions=self._sources['captions'].op)
-        }
+        return {'cap': self._db.ops.PrintCap(captions=self._sources['captions'].op)}
 
     def build_sink(self):
         return BoundOp(
@@ -27,5 +28,6 @@ class PrintCaptionsPipeline(Pipeline):
                 '{}_{}'.format(arg['path'], self.job_suffix)
                 for arg in self._sources['captions'].args
             ])
+
 
 print_captions = PrintCaptionsPipeline.make_runner()
