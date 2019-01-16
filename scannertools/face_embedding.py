@@ -10,8 +10,7 @@ import numpy as np
 MODEL_FILE = 'https://storage.googleapis.com/esper/models/facenet/20170512-110547.tar.gz'
 
 
-@scannerpy.register_python_op(name='EmbedFacesCPU', device_type=DeviceType.CPU)
-@scannerpy.register_python_op(name='EmbedFacesGPU', device_type=DeviceType.GPU)
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]])
 class EmbedFaces(TensorFlowKernel):
     def build_graph(self):
         import tensorflow as tf
@@ -78,7 +77,7 @@ class FaceEmbeddingPipeline(Pipeline):
     def build_pipeline(self):
         return {
             'embeddings':
-            getattr(self._db.ops, 'EmbedFaces{}'.format('GPU' if self._device == DeviceType.GPU else 'CPU'))(
+            self._db.ops.EmbedFaces(
                 frame=self._sources['frame_sampled'].op,
                 bboxes=self._sources['bboxes'].op,
                 model_dir=self._model_dir,

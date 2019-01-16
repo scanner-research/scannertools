@@ -2,12 +2,12 @@ from .prelude import Pipeline, try_import
 from scannerpy import Kernel, FrameType, DeviceType
 from scannerpy.stdlib.util import download_temp_file
 from scannerpy.stdlib import readers
+from scannerpy.stdlib.torch import TorchKernel
 import scannerpy
 import pickle
 import sys
 import os
 import numpy as np
-from .clothing_detection import TorchKernel
 from typing import Sequence
 
 MODEL_URL = 'https://storage.googleapis.com/esper/models/clothing/model_hairstyle.tar'
@@ -17,11 +17,11 @@ MODEL_DEF_URL = 'https://raw.githubusercontent.com/Haotianz94/video-analysis/mas
 ATTRIBUTES = [
     {
         'key': 'Hair color 3',
-        'values': {'black' : 0, 'white': 1, 'blond': 2}, 
+        'values': {'black' : 0, 'white': 1, 'blond': 2},
     },
     {
         'key': 'Hair color 5',
-        'values': {'black' : 0, 'white': 1, 'blond' : 2, 'brown' : 3, 'gray' : 4}, 
+        'values': {'black' : 0, 'white': 1, 'blond' : 2, 'brown' : 3, 'gray' : 4},
     },
     {
         'key': 'Hair length',
@@ -49,8 +49,7 @@ class HairStyle:
 
 BATCH_SIZE = 2
 
-@scannerpy.register_python_op(name='DetectHairStyleCPU', device_type=DeviceType.CPU, batch=BATCH_SIZE)
-@scannerpy.register_python_op(name='DetectHairStyleGPU', device_type=DeviceType.GPU, batch=BATCH_SIZE)
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=BATCH_SIZE)
 class DetectHairStyle(TorchKernel):
     def __init__(self, config):
         from torchvision import transforms

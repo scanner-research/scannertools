@@ -21,7 +21,7 @@ GRAPH_PATH = os.path.join(
     'frozen_inference_graph.pb')
 
 
-@scannerpy.register_python_op()
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]])
 class DetectObjects(TensorFlowKernel):
     def build_graph(self):
         import tensorflow as tf
@@ -77,14 +77,13 @@ class ObjectDetectionPipeline(Pipeline):
             download_temp_file(LABEL_URL)
 
     def build_pipeline(self):
-        bboxes = self._db.ops.DetectObjects(frame=self._sources[
-            'frame_sampled'].op if 'frame_sampled' in self._sources else self._sources['frame'].op)
-        outputs = {'bboxes': bboxes}
-
-        # if nms_threshold is not None:
-        #     outputs['nmsed_bboxes'] = self._db.ops.BboxNMS(bboxes, threshold=nms_threshold)
-
-        return outputs
+        return {
+            'bboxes':
+            self._db.ops.DetectObjects(
+                frame=self._sources['frame_sampled'].op
+                if 'frame_sampled' in self._sources else self._sources['frame'].op,
+                device=self._device)
+        }
 
 
 detect_objects = ObjectDetectionPipeline.make_runner()
