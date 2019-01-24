@@ -2,10 +2,15 @@ from attr import attrs, attrib, evolve
 from .video import Video
 from collections import namedtuple, defaultdict
 import scannerpy
+import inspect
 
-class Block:
-    inputs = None
-    outputs = None
+class BlockMeta(type):
+    def __init__(cls, name, bases, ns):
+        super(BlockMeta, cls).__init__(name, bases, ns)
+        cls.Output = namedtuple('Output', cls.outputs)
+
+class Block(metaclass=BlockMeta):
+    outputs = []
     varying = []
 
     def _pipeline_initialize(self, db, device):
@@ -13,14 +18,20 @@ class Block:
         self.device = device
 
     def validate(self):
-        assert self.inputs != None
-        assert self.outputs != None
+        pass
 
     def fetch_resources(self):
         pass
 
     def args(self):
         return None
+
+    def build(self, *args, **kwargs):
+        raise NotImplemented
+
+    def get_inputs(self, fn):
+        sig = inspect.signature(fn)
+        return list(sig.parameters)
 
     def __str__(self):
         return type(self).__name__
@@ -52,14 +63,12 @@ class SinkBlock(Block):
         raise NotImplemented
 
 class Histogram(Block):
-    inputs = ['frame']
     outputs = ['histogram']
 
     def build(self, frame):
-        return {'histogram': self.db.ops.Histogram(frame=frame)}
+        return self.Output(histogram=self.db.ops.Histogram(frame=frame))
 
 class FaceDetect(Block):
-    inputs = ['frame']
     outputs = ['face_bboxes']
 
     def fetch_resources(self):
@@ -68,45 +77,39 @@ class FaceDetect(Block):
 
     def build(self, frame):
         import align, os
-        return {
-            'face_bboxes':
-            self.db.ops.MTCNNDetectFaces(
+        return self.Output(
+            face_bboxes=self.db.ops.MTCNNDetectFaces(
                 frame=frame,
                 model_dir=os.path.dirname(align.__file__),
-                device=self.device)
-        }
+                device=self.device))
 
 class ColumnSource(Block):
-    inputs = []
     outputs = ['column']
 
     def build(self):
-        return {'column': self.db.sources.Column()}
+        return self.Output(column=self.db.sources.Column())
 
 class FrameSource(Block):
-    inputs = []
     outputs = ['frame']
     varying = ['video']
 
     def build(self):
-        return {'frame': self.db.sources.FrameColumn()}
+        return self.Output(frame=self.db.sources.FrameColumn())
 
     def args(self, video):
         return {'frame': self.db.table(video.video.scanner_name()).column('frame')}
 
 class Gather(Block):
-    inputs = ['column']
     outputs = ['column']
     varying = ['indices']
 
     def build(self, column):
-        return {'column': self.db.streams.Gather(column)}
+        return self.Output(column=self.db.streams.Gather(column))
 
     def args(self, indices):
         return {'column': indices}
 
 class ColumnSink(SinkBlock):
-    inputs = ['column']
     outputs = ['sink']
     varying = ['table_name']
 
@@ -114,7 +117,7 @@ class ColumnSink(SinkBlock):
         self._parser = parser
 
     def build(self, column):
-        return {'sink': self.db.sinks.Column(columns={'column': column})}
+        return self.Output(sink=self.db.sinks.Column(columns={'column': column}))
 
     def args(self, table_name):
         return {'sink': table_name}
@@ -212,7 +215,7 @@ class Pipeline:
         self.blocks = {}
         for node_name in self.graph.toposort():
             node = self.graph.nodes[node_name]
-            required_inputs = node.inputs
+            required_inputs = node.get_inputs(node.build)
             incoming_edges = self.graph.incoming_edges(node_name)
 
             kwargs = {}
@@ -230,11 +233,11 @@ class Pipeline:
                 parent = parents[0]
                 parent_block = self.blocks[parent.vertex]
 
-                if not parent.attribute in parent_block:
+                if not hasattr(parent_block, parent.attribute):
                     raise Exception("Node `{}` does not have requested attribute `{}`".format(
                         parent.vertex, parent.attribute))
 
-                kwargs[input_name] = parent_block[parent.attribute]
+                kwargs[input_name] = getattr(parent_block, parent.attribute)
 
             self.blocks[node_name] = node.build(**kwargs)
 
@@ -284,7 +287,7 @@ class Pipeline:
                     continue
 
                 for op_name, val in block_op_args.items():
-                    op_args[self.blocks[node_name][op_name]] = val
+                    op_args[getattr(self.blocks[node_name], op_name)] = val
 
             self.jobs.append(scannerpy.Job(op_args=op_args))
 
@@ -310,7 +313,7 @@ class Pipeline:
             raise Exception("Scanner does not currently support more than one sink block.")
 
         block_name, block = sink_blocks[0]
-        sink_op = self.blocks[block_name][block.outputs[0]]
+        sink_op = getattr(self.blocks[block_name], block.outputs[0])
 
         # Filter jobs that aren't already committed
         if cache:

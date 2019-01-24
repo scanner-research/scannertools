@@ -32,7 +32,8 @@ if __name__ == "__main__":
                 'frame.video': FrameDataSource(video),
                 'frame_sampled.indices': [0, 1, 2],
                 'sink.table_name': 'face'
-            }])
+            }],
+            cache=False)
 
         h = list(hists['sink'][0].load())
         print(h)
