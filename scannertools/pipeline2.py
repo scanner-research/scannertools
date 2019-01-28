@@ -6,48 +6,59 @@ import inspect
 from scannerpy import FrameType
 from typing import Generic, TypeVar, Any
 
+
+@attrs(frozen=True)
+class LazyAccess:
+    obj = attrib()
+    key = attrib()
+
+    def get(self):
+        return getattr(self.obj, self.key)
+
+    def resolve(self):
+        next = self.get()
+        if isinstance(next, LazyAccess):
+            return next.resolve()
+        else:
+            return next
+
+    def __getattr__(self, key):
+        return LazyAccess(obj=self, key=key)
+
+
 T = TypeVar('T')
 
 class Stream(Generic[T]):
     pass
 
+class Sink(Generic[T]):
+    pass
+
+class Input:
+    def __init__(self, ty, default=None):
+        self._type = ty
+        self._default = default
+
+class Output:
+    def __init__(self, ty):
+        self._type = ty
+
 class OpGraphMeta(type):
     def __init__(cls, name, bases, ns):
         super(OpGraphMeta, cls).__init__(name, bases, ns)
-        cls.Aliases = namedtuple('Aliases', cls.aliases)
-
-@attrs(frozen=True)
-class Node:
-    graph = attrib()
-    name = attrib()
-
-    def get(self):
-        return getattr(self.graph._aliases, self.name)
-
-    def resolve(self):
-        next = self.get()
-        if isinstance(next, Node):
-            return next.resolve()
-        else:
-            assert(isinstance(next, OpLeaf))
-            return next._op
-
-    def __getattr__(self, name):
-        return Node(graph=self, name=name)
+        cls._output_keys = [k for k, v in vars(cls).items() if isinstance(v, Output)]
 
 class OpGraph(metaclass=OpGraphMeta):
-    aliases = []
-
     def __init__(self, *args, **kwargs):
         self._build_args = (args, kwargs)
         self._built = False
 
-    def __getattr__(self, name):
-        build_params = list(inspect.signature(self.build).parameters.keys())
-        if name in self.aliases or name in build_params:
-            return Node(graph=self, name=name)
+    def __getattribute__(self, k):
+        output_keys = super(OpGraph, self).__getattribute__('_output_keys')
+        if k in output_keys:
+            return LazyAccess(self, k)
         else:
-            raise AttributeError("'{}' object has no attribute '{}'".format(type(self).__name__, name))
+            return super(OpGraph, self).__getattribute__(k)
 
     def initialize(self, db):
         self.db = db
@@ -65,29 +76,29 @@ class OpGraph(metaclass=OpGraphMeta):
             if Stream in ty.__mro__:
                 kwargs[param] = kwargs[param].get()
 
-
-        my_globals = {k.name: v for k, v in globals.items() if k.graph == self}
-        aliases = self.build(*args, **kwargs, **my_globals)
-        self._aliases = aliases
+        my_globals = {k.key: v for k, v in globals.items() if k.obj == self}
+        bindings = self.build(*args, **kwargs, **my_globals)
+        self._bindings = bindings
 
         #nodes = self._search_and_toposort(aliases)
-        nodes = list(aliases._asdict().values())
+        nodes = list(self._bindings.values())
+        print(nodes)
 
         for node in nodes:
             if isinstance(node, OpLeaf):
                 graph = node
-            elif not isinstance(node, Node):
-                raise Exception("Object {} is not a Node".format(node))
+            elif not isinstance(node, LazyAccess):
+                raise Exception("Object {} is not a LazyAccess".format(node))
             else:
-                graph = node.graph
+                graph = node.obj
 
             graph.initialize(db)
             graph._build({
-                Node(k.graph.get(), k.name): v
-                for k, v in globals.items() if isinstance(k.graph, Node) and k.graph.get() == node
-             })
+                LazyAccess(k.obj.get(), k.key): v
+                for k, v in globals.items() if isinstance(k.obj, LazyAccess) and k.obj.get() == node
+            })
 
-        return type(aliases)(**{k: v.get() if isinstance(v, Node) else v for k, v in aliases._asdict().items()})
+        return type(aliases)(**{k: v.get() if isinstance(v, LazyAccess) else v for k, v in aliases._asdict().items()})
 
     def _search_and_toposort(self, aliases):
         # TODO
@@ -110,10 +121,10 @@ class OpLeaf:
         for node in self._args:
             if isinstance(node, OpLeaf):
                 graph = node
-            elif not isinstance(node, Node):
+            elif not isinstance(node, LazyAccess):
                 raise Exception("Object {} is not a Node".format(node))
             else:
-                graph = node.graph
+                graph = node.obj
 
             graph.initialize(db)
             graph._build({})
@@ -122,57 +133,82 @@ class OpLeaf:
         self._op = op
         return op
 
+
 class ScannerFrameSource(OpGraph):
-    aliases = ['frame']
+    frame = Output(Stream[FrameType])
 
     def build(self):
-        return self.Aliases(frame=OpLeaf(lambda: self.db.sources.FrameColumn()))
+        return {
+            self.frame: OpLeaf(lambda: self.db.sources.FrameColumn())
+        }
 
 class Gather(OpGraph):
-    aliases = ['stream']
+    input_stream = Input(Stream[Any])
+    output_stream = Output(Stream[Any])
 
-    def build(self, stream: Stream[Any]):
-        return self.Aliases(stream=OpLeaf(lambda stream: self.db.streams.Gather(stream), [stream]))
+    def build(self):
+        return {
+            self.output_stream: OpLeaf(lambda stream: self.db.streams.Gather(stream),
+                                       [self.input_stream])
+        }
 
 class GatheredFrame(OpGraph):
-    aliases = ['frame', 'stream']
+    frame = Output(Stream[FrameType])
+    stream = Output(Stream[FrameType])
 
     def build(self):
         frame = ScannerFrameSource()
         gather = Gather(stream=frame.frame)
-        return self.Aliases(frame=frame.frame, stream=gather.stream)
+        return {
+            self.frame: frame.frame,
+            self.stream: gather.stream
+        }
 
 class Histogram(OpGraph):
-    aliases = ['histogram']
+    frame = Input(Stream[FrameType])
+    bins = Input(int, 16)
+    histogram = Output(Stream[bytes])
 
-    def build(self, frame: Stream[FrameType], bins: int = 16):
-        return self.Aliases(histogram=OpLeaf(lambda frame: self.db.ops.Histogram(frame=frame), [frame]))
+    def build(self):
+        print(self.bins)
+        return {
+            self.histogram: OpLeaf(lambda frame: self.db.ops.Histogram(frame=frame),
+                                   [self.frame])
+        }
 
 class ScannerColumnSink(OpGraph):
-    aliases = ['column']
+    column = Input(Stream[Any])
+    sink = Input(Sink[Any])
 
     def build(self, column: Stream[bytes]):
-        return self.Aliases(
-            column=OpLeaf(lambda column: self.db.sinks.Column(columns={'column': column}), [column]))
+        return {
+            self.sink: OpLeaf(lambda column: self.db.sinks.Column(columns={'column': column}),
+                              [self.column])
+        }
 
 class HistogramPipeline(OpGraph):
-    aliases = ['video', 'frames', 'histogram', 'table']
+    video = Output(Stream[FrameType])
+    frames = Output(Stream[FrameType])
+    histogram = Output(Stream[bytes])
+    table = Output(Sink[bytes])
 
     def build(self, test: int = 1):
         frame = GatheredFrame()
         histogram = Histogram(frame=frame.stream)
         sink = ScannerColumnSink(column=histogram.histogram)
-        return self.Aliases(
-            video=frame.frame,
-            frames=frame.stream,
-            histogram=histogram.histogram,
-            table=sink.column)
+        return {
+            self.video: frame.frame,
+            self.frames: frame.stream,
+            self.histogram: histogram.histogram,
+            self.table: sink.column
+        }
 
 from .prelude import sample_video
 with sample_video(delete=False) as video:
     db = scannerpy.Database()
     p = HistogramPipeline()
-    p.run(db,
-          outputs=[p.table],
-          per_video=[{p.video: video, p.table: "test"}],
-          globals={p.histogram.bins: 8, p.test: 2})
+    p.run(
+        db,
+        outputs=[p.table],
+        per_video=[{p.video: video, p.table: "test"}],
+        globals={p.histogram.bins: 8})
