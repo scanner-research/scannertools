@@ -30,6 +30,10 @@ class Input(IO):
 class Output(IO):
     type = attrib()
 
+def has_type(ty, base):
+    # TODO: what's the right way to do this?
+    return base in ty.__mro__
+
 @attrs(frozen=True)
 class BoundVar:
     cls = attrib()
@@ -40,9 +44,9 @@ class BoundVar:
         if isinstance(self.var, Input):
             ty = self.var.type
             cls_args = self.cls.args()
-            if Stream in ty.__mro__:
+            if has_type(ty, Stream):
                 return cls_args[self.key].resolve()
-            elif PerStream in ty.__mro__:
+            elif has_type(ty, PerStream):
                 if self.key in cls_args:
                     return cls_args[self.key].resolve()
                 else:
@@ -91,9 +95,9 @@ class OpGraph():
                 if isinstance(other_node, BoundVar) and isinstance(other_node.var, Output):
                     edges.add((self.op_param_to_op(other_node), node))
 
-        sorted_nodes = self.toposort(nodes, edges)
+        self._sorted_nodes = self.toposort(nodes, edges)
 
-        for node in sorted_nodes:
+        for node in self._sorted_nodes:
             node.initialize(self.db)
             node.expand_graph()
 
@@ -151,20 +155,27 @@ class OpGraph():
     def job_args(self):
         pass
 
-    def build_jobs(self, per_stream_args):
-        per_stream_arg_names = \
-            [k for k, v in vars(type(self)).items()
-             if isinstance(v, Input) and PerStream in v.type.__mro__]
+    def build_jobs(self, per_stream_args, job_args, N):
+        for node in self._sorted_nodes:
+            node_per_stream_args = {
+                getattr(node, k): (per_stream_args[arg])
+                for k, arg in node.args().items() if has_type(arg.var.type, PerStream)
+            }
+            if len(node_per_stream_args) > 0:
+                node.build_jobs(node_per_stream_args, job_args, N)
 
-        var_to_str_map = {v.key: v for v in per_stream_args[0].keys()}
 
-        jobs = []
-        for args in per_stream_args:
-            named_args = {name: args[var_to_str_map[name]] for name in per_stream_arg_names}
-            op_args = {k.resolve(): v for k, v in self.job_args(**named_args).items()}
-            jobs.append(scannerpy.Job(op_args=op_args))
+        job_args_builder_params = list(inspect.signature(self.job_args).parameters.keys())
+        if len(job_args_builder_params) > 0:
+            per_stream_arg_names = \
+                [k for k, v in vars(type(self)).items()
+                 if isinstance(v, Input) and has_type(v.type, PerStream)]
 
-        return jobs
+            var_to_str_map = {v.key: v for v in per_stream_args.keys()}
+
+            for i in range(N):
+                named_args = {name: per_stream_args[var_to_str_map[name]][i] for name in job_args_builder_params}
+                job_args[i].update({k.resolve(): v for k, v in self.job_args(**named_args).items()})
 
     def run(self, db, outputs, per_stream, globals={}):
         self._per_stream = per_stream
@@ -174,8 +185,14 @@ class OpGraph():
         output_ops = [node.resolve() for node in outputs]
         assert(len(output_ops) == 1)
 
-        jobs = self.build_jobs(per_stream)
-        db.run(output_ops[0], jobs)
+        assert(len(per_stream) >= 1)
+        N = len(per_stream)
+        job_args = [{} for _ in range(len(per_stream))]
+        per_stream_soa = {k: [s[k] for s in per_stream] for k in per_stream[0].keys()}
+        self.build_jobs(per_stream_soa, job_args, N)
+        jobs = [scannerpy.Job(op_args=op_args) for op_args in job_args]
+
+        db.run(output_ops[0], jobs, force=True)
 
 class OpLeaf(OpGraph):
     def __init__(self, f, args={}):
@@ -229,15 +246,12 @@ class GatheredFrame(OpGraph):
     stream = Output(Stream[FrameType])
 
     def build(self):
-        self._frame_source = ScannerFrameSource(video=self.video)
-        self._gather = Gather(input_stream=self._frame_source.frame)
+        frame_source = ScannerFrameSource(video=self.video)
+        gather = Gather(input_stream=frame_source.frame, indices=self.indices)
         return {
-            self.frame: self._frame_source.frame,
-            self.stream: self._gather.output_stream
+            self.frame: frame_source.frame,
+            self.stream: gather.output_stream
         }
-
-    def job_args(self, video, indices):
-        return {**self._frame_source.job_args(video=video), **self._gather.job_args(indices=indices)}
 
 class Histogram(OpGraph):
     frame = Input(Stream[FrameType])
@@ -271,16 +285,10 @@ class HistogramPipeline(OpGraph):
     table = Output(Sink[bytes])
 
     def build(self):
-        self._gathered_frame = GatheredFrame(video=self.video)
-        histogram = Histogram(frame=self._gathered_frame.stream)
-        self._sink = ScannerColumnSink(column=histogram.histogram, table_name=self.table_name)
-        return {self.table: self._sink.sink}
-
-    def job_args(self, video, indices, table_name):
-        return {
-            **self._gathered_frame.job_args(video=video, indices=indices),
-            **self._sink.job_args(table_name=table_name)
-        }
+        frame = GatheredFrame(video=self.video, indices=self.indices)
+        histogram = Histogram(frame=frame.stream)
+        sink = ScannerColumnSink(column=histogram.histogram, table_name=self.table_name)
+        return {self.table: sink.sink}
 
 
 from .prelude import sample_video
