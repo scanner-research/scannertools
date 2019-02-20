@@ -2,6 +2,7 @@ from .prelude import *
 import numpy as np
 import os
 
+
 class HistogramPipeline(Pipeline):
     job_suffix = 'hist'
     parser_fn = lambda _: readers.histograms
@@ -10,12 +11,12 @@ class HistogramPipeline(Pipeline):
         return {
             'histogram':
             self._db.ops.Histogram(
-                frame=self._sources['frame'].op,
-                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU,
-                batch=batch)
+                frame=self._sources['frame'].op, device=self._device, batch=batch)
         }
 
+
 compute_histograms = HistogramPipeline.make_runner()
+
 
 class HSVHistogramPipeline(Pipeline):
     job_suffix = 'hsv_hist'
@@ -26,19 +27,18 @@ class HSVHistogramPipeline(Pipeline):
         hsv_frames = self._db.ops.ConvertToHSV(frame=self._sources['frame'].op)
 
         return {
-            'histogram':
-            self._db.ops.Histogram(
-                frame=hsv_frames,
-                device=DeviceType.CPU if self._cpu_only else DeviceType.GPU,
-                batch=batch)
+            'histogram': self._db.ops.Histogram(frame=hsv_frames, device=self._device, batch=batch)
         }
 
+
 compute_hsv_histograms = HSVHistogramPipeline.make_runner()
+
 
 def flow_hist_reader(buf, protobufs):
     if buf is None:
         return None
     return np.split(np.frombuffer(buf, dtype=np.dtype(np.int32)), 2)
+
 
 class OpticalFlowHistogramPipeline(Pipeline):
     """
@@ -71,5 +71,5 @@ class OpticalFlowHistogramPipeline(Pipeline):
                 device=DeviceType.CPU)
         }
 
-compute_flow_histograms = OpticalFlowHistogramPipeline.make_runner()
 
+compute_flow_histograms = OpticalFlowHistogramPipeline.make_runner()

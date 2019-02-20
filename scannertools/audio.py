@@ -1,5 +1,6 @@
 from .prelude import *
 
+
 class AudioSource(DataSource):
     def __init__(self, video, frame_size=1.0, duration=None):
         self._video = video
@@ -14,6 +15,7 @@ class AudioSource(DataSource):
             'path': self._video.path(),
             'duration': self._duration if self._duration is not None else 0.0
         }
+
 
 class CaptionSource(DataSource):
     def __init__(self, captions, max_time, window_size=10.0):

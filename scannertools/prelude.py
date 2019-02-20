@@ -227,10 +227,12 @@ class Pipeline(ABC):
     def __init__(self, db):
         self._db = db
 
-    def _ingest(self, videos, batch=500):
-        videos = [v for v in videos if not self._db.has_table(v.scanner_name())]
-        if len(videos) > 0:
-            for i in tqdm(range(0, len(videos), batch)):
+    def ingest(self, videos, batch=500, force=False):
+        videos = [v for v in videos if force or not self._db.has_table(v.scanner_name())]
+        n = len(videos)
+        if n > 0:
+            print('Ingesting {} videos'.format(n))
+            for i in tqdm(range(0, n, batch), smoothing=0):
                 self._db.ingest_videos([
                     (v.scanner_name(), v.path())
                     for v in videos[i:i+batch]
@@ -253,7 +255,8 @@ class Pipeline(ABC):
             map_[self._sink.op] = self._sink.args[i]
             return Job(op_args=map_)
         jobs = par_for(make_job, list(range(len(self._sink.args))), workers=8, progress=False)
-        return [j for j in jobs if j is not None]
+        output = tuple(zip(*[(i, j) for i, j in enumerate(jobs) if j is not None]))
+        return ([], []) if output == () else output
 
     def committed(self, output):
         return self._db.has_table(output) and self._db.table(output).committed()
@@ -265,7 +268,7 @@ class Pipeline(ABC):
         sources = {}
 
         if videos is not None:
-            self._ingest(videos)
+            self.ingest(videos)
 
             frame = self._db.sources.FrameColumn()
             sources['frame'] = BoundOp(
@@ -298,26 +301,35 @@ class Pipeline(ABC):
             ])
 
     def parse_output(self):
-        if len(self._output_ops.keys()) == 1:
-            col_name = list(self._output_ops.keys())[0]
+        output_cols = list(self._output_ops.keys())
+        if len(output_cols) == 1:
             return [
                 ScannerColumn(
-                    self._db.table(t).column(col_name),
+                    self._db.table(t).column(output_cols[0]),
                     self.parser_fn() if self.parser_fn is not None else None)
                 if self.committed(t) else None
                 for t in self._sink.args
             ]
         else:
-            raise Exception("Multiple outputs, no default can be returned")
+            return [
+                {
+                    col_name: ScannerColumn(
+                        self._db.table(t).column(col_name),
+                    self.parser_fn[col_name]() if self.parser_fn is not None else None)
+                    for col_name in output_cols
+                }
+                if self.committed(t) else None
+                for t in self._sink.args
+            ]
 
     def build_pipeline(self):
         raise NotImplemented
 
-    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, cpu_only=False, detach=False, megabatch=10000, cache=True):
+    def execute(self, source_args={}, pipeline_args={}, sink_args={}, output_args={}, run_opts={}, custom_opts={}, no_execute=False, device=DeviceType.CPU, detach=False, megabatch=25000, cache=True):
         self._custom_run_opts = {**self.run_opts, **run_opts}
         self._custom_opts = custom_opts
 
-        self._cpu_only = cpu_only or not self._db.has_gpu()
+        self._device = device
 
         self.fetch_resources()
 
@@ -327,7 +339,7 @@ class Pipeline(ABC):
 
         self._sink = self.build_sink(**sink_args)
 
-        jobs = self._build_jobs(cache)
+        _, jobs = self._build_jobs(cache)
 
         if not no_execute and len(jobs) > 0:
             print('Executing {} jobs'.format(len(jobs)))
@@ -342,7 +354,7 @@ class Pipeline(ABC):
 
     @classmethod
     def make_runner(cls):
-        def runner(db, run_opts={}, cache=True, detach=False, no_execute=False, cpu_only=False, megabatch=10000, **kwargs):
+        def runner(db, run_opts={}, cache=True, detach=False, no_execute=False, device=DeviceType.CPU, megabatch=25000, **kwargs):
             pipeline = cls(db)
 
             def method_arg_names(f):
@@ -382,7 +394,7 @@ class Pipeline(ABC):
                 output_args=output_args,
                 run_opts=run_opts,
                 custom_opts=custom_opts,
-                cpu_only=cpu_only,
+                device=device,
                 no_execute=no_execute,
                 megabatch=megabatch,
                 detach=detach,

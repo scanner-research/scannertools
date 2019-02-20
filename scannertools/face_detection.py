@@ -4,8 +4,7 @@ from typing import List
 import os.path
 
 
-@scannerpy.register_python_op(name='MTCNNDetectFacesCPU', device_type=DeviceType.CPU)
-@scannerpy.register_python_op(name='MTCNNDetectFacesGPU', device_type=DeviceType.GPU)
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]])
 class MTCNNDetectFaces(TensorFlowKernel):
     def build_graph(self):
         import tensorflow as tf
@@ -80,9 +79,10 @@ class FaceDetectionPipeline(Pipeline):
         import align
         return {
             'bboxes':
-            getattr(self._db.ops, 'MTCNNDetectFaces{}'.format('GPU' if self._db.has_gpu() else 'CPU'))(
-                frame=self._sources['frame_sampled'].op, model_dir=os.path.dirname(align.__file__),
-                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
+            self._db.ops.MTCNNDetectFaces(
+                frame=self._sources['frame_sampled'].op,
+                model_dir=os.path.dirname(align.__file__),
+                device=self._device)
         }
 
 
