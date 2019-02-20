@@ -55,8 +55,14 @@ class OpticalFlowHistogramPipeline(Pipeline):
             os.path.join(cwd, 'cpp_ops/build/imgproc_pb2.py'))
 
     def build_pipeline(self):
-        flow = self._db.ops.OpticalFlow(
+        small_frames = self._db.ops.Resize(
                 frame=self._sources['frame_sampled'].op,
+                device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU,
+                width=426,
+                height=240)
+
+        flow = self._db.ops.OpticalFlow(
+                frame=small_frames,
                 device=DeviceType.GPU if self._db.has_gpu() else DeviceType.CPU)
         return {
             'flow_hist':
