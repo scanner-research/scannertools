@@ -11,6 +11,42 @@
 
 namespace scanner{
 
+class ConvertToHSVKernel : public scanner::Kernel, public scanner::VideoKernel {
+  public:
+    ConvertToHSVKernel(const scanner::KernelConfig& config)
+        : scanner::Kernel(config) {
+      ImgProcArgs args;
+      args.ParseFromArray(config.args.data(), config.args.size());
+      width_ = args.width();
+      height_ = args.height();
+    }
+
+    void execute(const scanner::Elements& input_columns,
+        scanner::Elements& output_columns) override {
+      auto& frame_col = input_columns[0];
+
+      check_frame(scanner::CPU_DEVICE, frame_col);
+
+      const scanner::Frame* frame = frame_col.as_const_frame();
+      cv::Mat input = scanner::frame_to_mat(frame);
+
+      auto& output_frame_col = output_columns[0];
+      scanner::FrameInfo output_frame_info(height_, width_, 3, scanner::FrameType::U8);
+      
+      scanner::Frame* output_frame =
+        scanner::new_frame(scanner::CPU_DEVICE, output_frame_info);
+      cv::Mat output = scanner::frame_to_mat(output_frame);
+
+      cv::cvtColor(input, output, cv::COLOR_RGB2HSV);
+
+      insert_frame(output_frame_col, output_frame);
+    }
+
+  private:
+    int width_;
+    int height_;
+};
+
 class BrightnessKernel : public scanner::Kernel, public scanner::VideoKernel {
   public:
     BrightnessKernel(const scanner::KernelConfig& config)
@@ -196,6 +232,15 @@ class SharpnessBBoxKernel : public scanner::Kernel, public scanner::VideoKernel 
     int width_;
     int height_;
 };
+
+REGISTER_OP(ConvertToHSVCPP)
+  .frame_input("frame")
+  .frame_output("frame")
+  .protobuf_name("ImgProcArgs");
+
+REGISTER_KERNEL(ConvertToHSVCPP, ConvertToHSVKernel)
+  .device(scanner::DeviceType::CPU)
+  .num_devices(1);
 
 REGISTER_OP(BrightnessCPP)
   .frame_input("frame")

@@ -21,10 +21,16 @@ compute_histograms = HistogramPipeline.make_runner()
 class HSVHistogramPipeline(Pipeline):
     job_suffix = 'hsv_hist'
     parser_fn = lambda _: readers.histograms
-    run_opts = {'pipeline_instances_per_node': 1}
+
+    def fetch_resources(self):
+        cwd = os.path.dirname(os.path.abspath(__file__))
+
+        self._db.load_op(
+            os.path.join(cwd, 'cpp_ops/build/libimgproc_op.so'),
+            os.path.join(cwd, 'cpp_ops/build/imgproc_pb2.py'))
 
     def build_pipeline(self, batch=1):
-        hsv_frames = self._db.ops.ConvertToHSV(frame=self._sources['frame'].op)
+        hsv_frames = self._db.ops.ConvertToHSVCPP(frame=self._sources['frame'].op)
 
         return {
             'histogram': self._db.ops.Histogram(frame=hsv_frames, device=self._device, batch=batch)
