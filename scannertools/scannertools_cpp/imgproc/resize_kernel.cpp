@@ -3,26 +3,30 @@
 #include "scanner/util/cuda.h"
 #include "scanner/util/memory.h"
 #include "scanner/util/opencv.h"
-#include "scannertools.pb.h"
+#include "stdlib/stdlib.pb.h"
 
 namespace scanner {
+namespace {
+const std::map<std::string, int> INTERP_TYPES = {
+    {u8"INTER_NEAREST", cv::INTER_NEAREST},
+    {u8"INTER_LINEAR", cv::INTER_LINEAR},
+    {u8"INTER_CUBIC", cv::INTER_CUBIC},
+    {u8"INTER_AREA", cv::INTER_AREA},
+    {u8"INTER_LANCZOS4", cv::INTER_LANCZOS4},
+    {u8"INTER_MAX", cv::INTER_MAX},
+    {u8"WARP_FILL_OUTLIERS", cv::WARP_FILL_OUTLIERS},
+    {u8"WARP_INVERSE_MAP", cv::WARP_INVERSE_MAP},
+};
+}
 
 class ResizeKernel : public BatchedKernel {
  public:
   ResizeKernel(const KernelConfig& config)
     : BatchedKernel(config), device_(config.devices[0]) {
-    args_.ParseFromArray(config.args.data(), config.args.size());
+  }
 
-    const std::map<std::string, int> INTERP_TYPES = {
-      {u8"INTER_NEAREST", cv::INTER_NEAREST},
-      {u8"INTER_LINEAR", cv::INTER_LINEAR},
-      {u8"INTER_CUBIC", cv::INTER_CUBIC},
-      {u8"INTER_AREA", cv::INTER_AREA},
-      {u8"INTER_LANCZOS4", cv::INTER_LANCZOS4},
-      {u8"INTER_MAX", cv::INTER_MAX},
-      {u8"WARP_FILL_OUTLIERS", cv::WARP_FILL_OUTLIERS},
-      {u8"WARP_INVERSE_MAP", cv::WARP_INVERSE_MAP},
-    };
+  void new_stream(const std::vector<u8>& args) override {
+    args_.ParseFromArray(args.data(), args.size());
 
     interp_type_ = cv::INTER_LINEAR;
     if (INTERP_TYPES.count(args_.interpolation()) > 0) {
@@ -91,11 +95,11 @@ class ResizeKernel : public BatchedKernel {
 
  private:
   DeviceHandle device_;
-  ResizeArgs args_;
+  proto::ResizeArgs args_;
   int interp_type_;
 };
 
-REGISTER_OP(Resize).frame_input("frame").frame_output("frame").protobuf_name(
+REGISTER_OP(Resize).frame_input("frame").frame_output("frame").stream_protobuf_name(
     "ResizeArgs");
 
 REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::CPU).num_devices(1);
@@ -104,3 +108,4 @@ REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::CPU).num_devices(1);
 REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::GPU).num_devices(1);
 #endif
 }
+
