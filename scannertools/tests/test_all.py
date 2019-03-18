@@ -6,7 +6,7 @@ from scannertools.storage.python_storage import PythonStream
 from scannertools.storage.files_storage import FilesStream
 import tempfile
 import json
-from scannerpy import CacheMode, DeviceType
+from scannerpy import CacheMode, DeviceType, protobufs
 from scannerpy.storage import NamedStream, NamedVideoStream
 import requests
 import scannerpy
@@ -30,6 +30,17 @@ def download_transcript():
         for block in resp.iter_content(1024):
             f.write(block)
         return f.name
+
+
+def run_op(sc, op):
+    input = NamedVideoStream(sc, 'test1')
+    frame = sc.io.Input([input])
+    gather_frame = sc.streams.Gather(frame, [[0]])
+    faces = op(frame=gather_frame)
+    output = NamedStream(sc, 'output')
+    output_op = sc.io.Output(faces, [output])
+    sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1)
+    return list(output.load())
 
 
 @scannerpy.register_python_op(name='DecodeCap')
@@ -179,12 +190,40 @@ def test_blur(sc):
 
 
 def test_face_detection(sc):
+    output = run_op(sc, sc.ops.MTCNNDetectFaces)
+    assert len(output[0]) == 1
+    assert isinstance(output[0][0], protobufs.BoundingBox)
+
+
+def test_face_embedding(sc):
+    def make(frame):
+        bboxes = sc.ops.MTCNNDetectFaces(frame=frame)
+        return sc.ops.EmbedFaces(frame=frame, bboxes=bboxes)
+    output = run_op(sc, make)
+    assert len(output[0]) == 1
+
+
+def test_gender(sc):
+    def make(frame):
+        bboxes = sc.ops.MTCNNDetectFaces(frame=frame)
+        return sc.ops.DetectGender(frame=frame, bboxes=bboxes)
+    output = run_op(sc, make)
+    assert len(output[0]) == 1
+
+
+def test_object_detection(sc):
+    run_op(sc, sc.ops.DetectObjects)
+
+
+def test_shot_detection(sc):
     input = NamedVideoStream(sc, 'test1')
     frame = sc.io.Input([input])
-    gather_frame = sc.streams.Gather(frame, [[0]])
-    faces = sc.ops.MTCNNDetectFaces(frame=gather_frame)
-    output = NamedStream(sc, 'test_face')
-    output_op = sc.io.Output(faces, [output])
-    sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False)
-
-    assert len(list(output.load())[0]) == 1
+    range_frame = sc.streams.Range(frame, [{'start': 0, 'end': 1000}])
+    hist = sc.ops.Histogram(frame=range_frame)
+    boundaries = sc.ops.ShotBoundaries(histograms=hist)
+    output = NamedStream(sc, 'output')
+    output_op = sc.io.Output(boundaries, [output])
+    sc.run(
+        output_op, cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1,
+        work_packet_size=1000, io_packet_size=1000)
+    assert len(next(output.load(rows=[0]))) == 7
