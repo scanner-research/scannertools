@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+message SQLConfig {
+  string hostaddr = 1;
+  int32 port = 2;
+  string dbname = 3;
+  string user = 4;
+  string password = 5;
+  string adapter = 6;
+}
+
+message SQLQuery {
+  string fields = 1;
+  string table = 2;
+  string id = 4;
+  string group = 5;
+}
+
+message SQLEnumeratorArgs {
+  SQLConfig enum_config = 1;
+  SQLQuery enum_query = 2;
+  string filter = 3;
+  int32 num_elements = 4;
+}
+
+message SQLSourceArgs {
+  SQLConfig config = 1;
+  SQLQuery query = 2;
+}
+
+message SQLElementArgs {
+  string filter = 1;
+}
+
+message SQLSinkArgs {
+  SQLConfig config = 1;
+  string job_table = 2;
+  string table = 3;
+  bool insert = 4;
+  bool ignore_conflicts = 5;
+}
+
+message SQLSinkStreamArgs {
+  string job_name = 1;
+}
