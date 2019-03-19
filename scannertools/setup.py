@@ -1,5 +1,5 @@
 from setuptools import setup
-from scannertools_infra import CMakeExtension, CMakeBuild
+from scannertools_infra import CMakeExtension, CMakeBuild, CudaInstallCommand, CudaDevelopCommand
 
 if __name__ == "__main__":
     setup(
@@ -13,6 +13,6 @@ if __name__ == "__main__":
         packages=['scannertools'],
         setup_requires=['pytest-runner', 'scannertools_infra'],
         tests_require=['pytest', 'requests'],
-        cmdclass=dict(build_ext=CMakeBuild),
+        cmdclass=dict(build_ext=CMakeBuild, install=CudaInstallCommand, develop=CudaDevelopCommand),
         ext_modules=[CMakeExtension('scannertools', 'scannertools_cpp')],
         zip_safe=False)

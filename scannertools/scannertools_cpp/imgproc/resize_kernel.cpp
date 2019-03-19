@@ -3,7 +3,7 @@
 #include "scanner/util/cuda.h"
 #include "scanner/util/memory.h"
 #include "scanner/util/opencv.h"
-#include "stdlib/stdlib.pb.h"
+#include "scannertools.pb.h"
 
 namespace scanner {
 namespace {
@@ -95,7 +95,7 @@ class ResizeKernel : public BatchedKernel {
 
  private:
   DeviceHandle device_;
-  proto::ResizeArgs args_;
+  ResizeArgs args_;
   int interp_type_;
 };
 
@@ -108,4 +108,3 @@ REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::CPU).num_devices(1);
 REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::GPU).num_devices(1);
 #endif
 }
-

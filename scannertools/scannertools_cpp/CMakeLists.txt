@@ -13,7 +13,8 @@ add_subdirectory(misc)
 build_op(
   LIB_NAME scannertools
   CPP_SRCS ${SOURCES}
-  PROTO_SRC scannertools.proto)
+  PROTO_SRC scannertools.proto
+  BUILD_CUDA ${BUILD_CUDA})
 
 set(LIBRARIES)
 
