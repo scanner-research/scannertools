@@ -5,6 +5,7 @@ set(SOURCES
   image_encoder_kernel_cpu.cpp
   image_decoder_kernel_cpu.cpp
   resize_kernel.cpp
+  convert_color_kernel.cpp
   feature_extractor_kernel.cpp
   optical_flow_kernel_cpu.cpp)
 
