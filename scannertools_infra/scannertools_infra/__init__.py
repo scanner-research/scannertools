@@ -57,7 +57,6 @@ class CMakeBuild(build_ext):
             self.build_extension(ext)
 
     def build_extension(self, ext):
-        print(ext.__dict__)
         output_dir = os.path.join(ext.sourcedir, '..', ext.name, 'build')
         cfg = 'Debug' if self.debug else 'RelWithDebugInfo'
         build_args = ['--config', cfg, '--', '-j{}'.format(cpu_count())]
