@@ -4,7 +4,7 @@
 #include "scanner/util/memory.h"
 #include "scanner/util/opencv.h"
 #include "scanner/util/serialize.h"
-#include "scannertools.pb.h"
+#include "scannertools_imgproc.pb.h"
 
 #include <opencv2/xfeatures2d.hpp>
 

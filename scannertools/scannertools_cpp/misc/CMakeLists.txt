@@ -1,8 +1,10 @@
-set(NEW_SOURCES
-  misc/info_from_frame_kernel.cpp
-  misc/sleep_kernel.cpp
-  misc/test_increment_kernel.cpp
-  misc/pass_kernel.cpp
-  misc/discard_kernel.cpp)
+set(SOURCES
+  info_from_frame_kernel.cpp
+  sleep_kernel.cpp
+  test_increment_kernel.cpp
+  pass_kernel.cpp
+  discard_kernel.cpp)
 
-SET(SOURCES ${SOURCES} ${NEW_SOURCES} PARENT_SCOPE)
+build_op(
+  LIB_NAME scannertools_misc
+  CPP_SRCS ${SOURCES})

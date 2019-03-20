@@ -1,4 +1,3 @@
-from . import files_storage
-from . import audio_storage
-from . import caption_storage
-from . import python_storage
+from scannertools_infra import _register_module
+import os
+_register_module(os.path.join(__file__, '..'), "scannertools_storage")

@@ -16,7 +16,7 @@
 #include "scanner/api/source.h"
 #include "scanner/api/enumerator.h"
 #include "scanner/util/storehouse.h"
-#include "scannertools.pb.h"
+#include "scannertools_storage.pb.h"
 
 #include <glog/logging.h>
 #include <vector>

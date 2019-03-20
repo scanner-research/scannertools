@@ -15,7 +15,7 @@
 
 #include "scanner/api/source.h"
 #include "scanner/api/enumerator.h"
-#include "scannertools.pb.h"
+#include "scannertools_storage.pb.h"
 
 #include "storehouse/storage_backend.h"
 #include "scanner/engine/video_index_entry.h"

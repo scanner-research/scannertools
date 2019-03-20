@@ -3,7 +3,7 @@
 #include "scanner/util/memory.h"
 #include "scanner/util/opencv.h"
 #include "scanner/util/cuda.h"
-#include "scannertools.pb.h"
+#include "scannertools_imgproc.pb.h"
 
 namespace scanner {
 

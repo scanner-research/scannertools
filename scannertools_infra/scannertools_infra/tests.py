@@ -6,6 +6,10 @@ import requests
 import toml
 from subprocess import check_call as run
 import subprocess
+import GPUtil
+
+
+needs_gpu = pytest.mark.skipif(len(GPUtil.getGPUs()) == 0, reason='need GPU to run')
 
 
 def make_config(master_port=None, worker_port=None, path=None):

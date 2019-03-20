@@ -5,7 +5,7 @@
 #include "scanner/util/opencv.h"
 #include "scanner/util/serialize.h"
 #include "scanner/util/cycle_timer.h"
-#include "scannertools.pb.h"
+#include "scannertools_imgproc.pb.h"
 
 #include <opencv2/xfeatures2d.hpp>
 

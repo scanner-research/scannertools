@@ -16,7 +16,7 @@
 #include "scanner/api/kernel.h"
 #include "scanner/api/op.h"
 #include "scanner/util/memory.h"
-#include "scannertools.pb.h"
+#include "scannertools_imgproc.pb.h"
 
 #include <cmath>
 

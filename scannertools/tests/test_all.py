@@ -1,25 +1,28 @@
-from scannertools_infra.tests import sc, download_videos
-import scannertools
+from scannertools_infra.tests import sc, download_videos, needs_gpu
 from scannertools.storage.audio_storage import AudioStream
 from scannertools.storage.caption_storage import CaptionStream
 from scannertools.storage.python_storage import PythonStream
 from scannertools.storage.files_storage import FilesStream
+import scannertools.imgproc
+import scannertools.misc
+import scannertools.storage
+import scannertools.face_detection
 import tempfile
 import json
-from scannerpy import CacheMode, DeviceType, protobufs
-from scannerpy.storage import NamedStream, NamedVideoStream
+from scannerpy import CacheMode, DeviceType, protobufs, NamedStream, NamedVideoStream, PerfParams
 import requests
 import scannerpy
 import struct
 import pickle
 import numpy as np
 
+
 def test_audio(sc):
     (vid_path, _) = download_videos()
     audio = sc.io.Input([AudioStream(vid_path, 1.0)])
     ignored = sc.ops.DiscardFrame(ignore=audio)
     output = sc.io.Output(ignored, [NamedStream(sc, 'audio_test')])
-    sc.run(output, cache_mode=CacheMode.Overwrite)
+    sc.run(output, PerfParams.estimate(), cache_mode=CacheMode.Overwrite)
 
 
 def download_transcript():
@@ -39,7 +42,7 @@ def run_op(sc, op):
     faces = op(frame=gather_frame)
     output = NamedStream(sc, 'output')
     output_op = sc.io.Output(faces, [output])
-    sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1)
+    sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1)
     return list(output.load())
 
 
@@ -54,7 +57,7 @@ def test_captions(sc):
     captions = sc.io.Input([CaptionStream(caption_path, window_size=10.0, max_time=3600)])
     ignored = sc.ops.DecodeCap(cap=captions)
     output = sc.io.Output(ignored, [NamedStream(sc, 'caption_test')])
-    sc.run(output, cache_mode=CacheMode.Overwrite, pipeline_instances_per_node=1)
+    sc.run(output, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, pipeline_instances_per_node=1)
 
 
 def test_files_source(sc):
@@ -73,7 +76,7 @@ def test_files_source(sc):
     pass_data = sc.ops.Pass(input=data)
     output = NamedStream(sc, 'test_files_source')
     output_op = sc.io.Output(pass_data, [output])
-    sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False)
+    sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
 
     num_rows = 0
     for buf in output.load():
@@ -106,7 +109,7 @@ def test_files_sink(sc):
     pass_data = sc.ops.Pass(input=data)
     output = FilesStream(paths=output_paths)
     output_op = sc.io.Output(pass_data, [output])
-    sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False)
+    sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
 
     # Read output test files
     for i, s in enumerate(output.load()):
@@ -123,7 +126,7 @@ def test_python_source(sc):
     pass_data = sc.ops.Pass(input=data)
     output = NamedStream(sc, 'test_python_source')
     output_op = sc.io.Output(pass_data, [output])
-    sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False)
+    sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
 
     num_rows = 0
     for i, buf in enumerate(output.load()):
@@ -138,9 +141,9 @@ class DeviceTestBench:
     def test_cpu(self, sc):
         self.run(sc, DeviceType.CPU)
 
-    # @gpu
-    # def test_gpu(self, sc):
-    #     self.run(sc, DeviceType.GPU)
+    @needs_gpu
+    def test_gpu(self, sc):
+        self.run(sc, DeviceType.GPU)
 
 
 class TestHistogram(DeviceTestBench):
@@ -151,7 +154,7 @@ class TestHistogram(DeviceTestBench):
         output = NamedStream(sc, 'test_hist')
         output_op = sc.io.Output(hist, [output])
 
-        sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False)
+        sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
         next(output.load())
 
 
@@ -163,7 +166,7 @@ class TestOpticalFlow(DeviceTestBench):
         flow_range = sc.streams.Range(flow, ranges=[{'start': 0, 'end': 50}])
         output = NamedStream(sc, 'test_flow')
         output_op = sc.io.Output(flow_range, [output])
-        sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False)
+        sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
         assert output.len() == 50
 
         flow_array = next(output.load())
@@ -180,7 +183,7 @@ def test_blur(sc):
     blurred_frame = sc.ops.Blur(frame=range_frame, kernel_size=3, sigma=0.1)
     output = NamedVideoStream(sc, 'test_blur')
     output_op = sc.io.Output(blurred_frame, [output])
-    sc.run(output_op, cache_mode=CacheMode.Overwrite, show_progress=False)
+    sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
 
     frame_array = next(output.load())
     assert frame_array.dtype == np.uint8
@@ -224,6 +227,6 @@ def test_shot_detection(sc):
     output = NamedStream(sc, 'output')
     output_op = sc.io.Output(boundaries, [output])
     sc.run(
-        output_op, cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1,
+        output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1,
         work_packet_size=1000, io_packet_size=1000)
     assert len(next(output.load(rows=[0]))) == 7

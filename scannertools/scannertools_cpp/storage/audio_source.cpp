@@ -1,7 +1,7 @@
 #include "scanner/api/enumerator.h"
 #include "scanner/api/source.h"
 #include "scanner/util/ffmpeg.h"
-#include "scannertools.pb.h"
+#include "scannertools_storage.pb.h"
 
 #include <math.h>
 #include <fstream>

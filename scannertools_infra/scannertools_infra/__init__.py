@@ -87,12 +87,14 @@ class CMakeBuild(build_ext):
         print()  # Add an empty line for cleaner output
 
 
-def _register_module(path):
+def _register_module(path, module):
     cwd = os.path.dirname(os.path.abspath(path))
-    module = os.path.basename(cwd)
     so_path = os.path.join(cwd, 'build/lib{}.so'.format(module))
     proto_path = os.path.join(cwd, 'build/{}_pb2.py'.format(module))
-    if os.path.isfile(so_path):
-        register_module(so_path, proto_path if os.path.isfile(proto_path) else None)
-        if os.path.isfile(proto_path):
-            protobufs.add_module(proto_path)
+
+    if not os.path.isfile(so_path):
+        raise Exception("Error: missing so file {}".format(so_path))
+
+    register_module(so_path, proto_path if os.path.isfile(proto_path) else None)
+    if os.path.isfile(proto_path):
+        protobufs.add_module(proto_path)

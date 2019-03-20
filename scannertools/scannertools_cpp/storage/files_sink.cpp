@@ -15,7 +15,7 @@
 
 #include "scanner/api/sink.h"
 #include "scanner/util/storehouse.h"
-#include "scannertools.pb.h"
+#include "scannertools_storage.pb.h"
 
 #include "storehouse/storage_backend.h"
 

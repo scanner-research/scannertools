@@ -1,8 +1,9 @@
-from scannertools_infra.tests import sc
+from scannertools_infra.tests import sc, needs_gpu
 from scannerpy.storage import NamedVideoStream, NamedStream
 from scannerpy import PerfParams, DeviceType
 import scannertools_caffe.pose_detection
 
+@needs_gpu
 def test_pose(sc):
     vid = [NamedVideoStream(sc, 'test1')]
     frame = sc.io.Input(vid)
@@ -22,10 +23,3 @@ def test_pose(sc):
     output_op = sc.io.Output(pose, [output])
 
     sc.run(output_op, PerfParams.estimate())
-
-    import cv2
-    for i, poses in zip(range(0, 1000, 100), output.load()):
-        img = next(vid[0].load(rows=[i]))
-        for pose in poses:
-            pose.draw(img)
-        cv2.imwrite('pose{:04d}.jpg'.format(i), img)
