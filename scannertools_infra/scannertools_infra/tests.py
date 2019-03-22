@@ -8,9 +8,11 @@ from subprocess import check_call as run
 import subprocess
 import GPUtil
 
-
-needs_gpu = pytest.mark.skipif(len(GPUtil.getGPUs()) == 0, reason='need GPU to run')
-
+def needs_gpu():
+    try:
+        return pytest.mark.skipif(len(GPUtil.getGPUs()) == 0, reason='need GPU to run')
+    except Exception:
+        return pytest.mark.skipif(True, reason='need GPU to run')
 
 def make_config(master_port=None, worker_port=None, path=None):
     cfg = Config.default_config()

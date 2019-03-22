@@ -6,6 +6,7 @@ import os
 import tarfile
 import numpy as np
 import scannerpy
+from typing import Sequence
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -20,7 +21,7 @@ GRAPH_PATH = os.path.join(
     'frozen_inference_graph.pb')
 
 
-@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]])
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=5)
 class DetectObjects(TensorFlowKernel):
     def build_graph(self):
         import tensorflow as tf
@@ -41,20 +42,23 @@ class DetectObjects(TensorFlowKernel):
 
     # Evaluate object detection DNN model on a frame
     # Return bounding box position, class and score
-    def execute(self, frame: FrameType) -> BboxList:
+    def execute(self, frame: Sequence[FrameType]) -> Sequence[BboxList]:
         image_tensor = self.graph.get_tensor_by_name('image_tensor:0')
         boxes = self.graph.get_tensor_by_name('detection_boxes:0')
         scores = self.graph.get_tensor_by_name('detection_scores:0')
         classes = self.graph.get_tensor_by_name('detection_classes:0')
         with self.graph.as_default():
             (boxes, scores, classes) = self.sess.run(
-                [boxes, scores, classes], feed_dict={image_tensor: np.expand_dims(frame, axis=0)})
+                [boxes, scores, classes], feed_dict={image_tensor: np.concatenate(np.expand_dims(frame, axis=0), axis=0)})
 
             bboxes = [
-                protobufs.BoundingBox(
-                    x1=box[1], y1=box[0], x2=box[3], y2=box[2], score=score, label=cls)
-                for (box, score, cls) in zip(
-                    boxes.reshape(100, 4), scores.reshape(100, 1), classes.reshape(100, 1))
+                [
+                    protobufs.BoundingBox(
+                        x1=box[1], y1=box[0], x2=box[3], y2=box[2], score=score, label=cls)
+                    for (box, score, cls) in zip(
+                        boxes[i, :, :].reshape(100, 4), scores[i, :].reshape(100, 1), classes[i, :].reshape(100, 1))
+                ]
+                for i in range(len(frame))
             ]
 
             return bboxes
