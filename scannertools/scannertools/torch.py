@@ -1,7 +1,7 @@
-from ..kernel import Kernel
+from scannerpy.kernel import Kernel
 from scannerpy import DeviceType
 import sys
-
+import numpy as np
 
 class TorchKernel(Kernel):
     def __init__(self, config):
@@ -30,12 +30,7 @@ class TorchKernel(Kernel):
 
     def images_to_tensor(self, images):
         import torch
-
-        shape = images[0].shape
-        images_tensor = torch.Tensor(len(images), shape[0], shape[1], shape[2])
-        for i in range(len(images)):
-            images_tensor[i] = images[i]
-        return images_tensor
+        return torch.from_numpy(np.concatenate(np.expand_dims(images, axis=0), axis=0))
 
     def build_model(self):
         import torch

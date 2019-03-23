@@ -9,7 +9,8 @@ set(SOURCES tfcpp.cpp)
 
 build_op(
   LIB_NAME scannertools_tfcpp
-  CPP_SRCS ${SOURCES})
+  CPP_SRCS ${SOURCES}
+  BUILD_CUDA ${BUILD_CUDA})
   #PROTO_SRC scannertools_tfcpp.proto)
 
 set(LIBTF_PATH /home/will/libtensorflow)

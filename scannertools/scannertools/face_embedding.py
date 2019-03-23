@@ -4,13 +4,22 @@ from scannerpy.util import download_temp_file, temp_directory
 from .tensorflow import TensorFlowKernel
 import os
 import numpy as np
-from scannerpy.types import BboxList
+from scannerpy.types import BboxList, UniformList, NumpyArrayFloat32
+from typing import Sequence
 
 MODEL_FILE = 'https://storage.googleapis.com/esper/models/facenet/20170512-110547.tar.gz'
 
+EMBEDDING_SIZE = 128
+FacenetEmbeddings = UniformList(
+    'FacenetEmbeddings', NumpyArrayFloat32, EMBEDDING_SIZE * np.dtype(np.float32).itemsize)
 
-@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]])
+
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=5)
 class EmbedFaces(TensorFlowKernel):
+    def __init__(self, config, minibatch = 5):
+        self._minibatch = 5
+        TensorFlowKernel.__init__(self, config)
+
     def build_graph(self):
         import tensorflow as tf
         self.images_placeholder = None
@@ -22,7 +31,7 @@ class EmbedFaces(TensorFlowKernel):
     def fetch_resources(self):
         download_temp_file(MODEL_FILE, untar=True)
 
-    def execute(self, frame: FrameType, bboxes: BboxList) -> bytes:
+    def execute(self, frame: Sequence[FrameType], bboxes: Sequence[BboxList]) -> Sequence[FacenetEmbeddings]:
         import facenet
         import cv2
         import tensorflow as tf
@@ -42,26 +51,39 @@ class EmbedFaces(TensorFlowKernel):
                         'phase_train:0')
             print('Model loaded!')
 
-        [h, w] = frame.shape[:2]
+        [h, w] = frame[0].shape[:2]
 
         out_size = 160
         outputs = b''
-        for bbox in bboxes:
-            # NOTE: if using output of mtcnn, not-normalized, so removing de-normalization factors here
-            face_img = frame[int(bbox.y1 * h):int(bbox.y2 * h), int(bbox.x1 * w):int(bbox.x2 * w)]
-            [fh, fw] = face_img.shape[:2]
-            if fh == 0 or fw == 0:
-                outputs += np.zeros(128, dtype=np.float32).tobytes()
-            else:
-                face_img = cv2.resize(face_img, (out_size, out_size))
-                face_img = facenet.prewhiten(face_img)
-                embs = self.sess.run(
-                    self.embeddings,
-                    feed_dict={
-                        self.images_placeholder: [face_img],
-                        self.phase_train_placeholder: False
-                    })
+        cleaned_images = []
+        source_indices = []
+        output_embs = [[None for _ in l] for l in bboxes]
+        for i, frame_bboxes in enumerate(bboxes):
+            for j, bbox in enumerate(frame_bboxes):
+                # NOTE: if using output of mtcnn, not-normalized, so removing de-normalization factors here
+                face_img = frame[i][int(bbox.y1 * h):int(bbox.y2 * h), int(bbox.x1 * w):int(bbox.x2 * w)]
+                [fh, fw] = face_img.shape[:2]
+                if fh == 0 or fw == 0:
+                    output_embs[i][j] = np.zeros(128, dtype=np.float32)
+                else:
+                    face_img = cv2.resize(face_img, (out_size, out_size))
+                    face_img = facenet.prewhiten(face_img)
+                    cleaned_images.append(face_img)
+                    source_indices.append((i, j))
 
-                outputs += embs[0].tobytes()
+        for k in range(0, len(cleaned_images), self._minibatch):
+            embs = self.sess.run(
+                self.embeddings,
+                feed_dict={
+                    self.images_placeholder: cleaned_images[k:k+self._minibatch],
+                    self.phase_train_placeholder: False
+                })
 
-        return b'\0' if outputs == b'' else outputs
+            for emb, (i, j) in zip(embs, source_indices[k:k+self._minibatch]):
+                output_embs[i][j] = emb
+
+        for l in output_embs:
+            for e in l:
+                assert e is not None
+
+        return output_embs

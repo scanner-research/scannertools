@@ -102,9 +102,9 @@ class ResizeKernel : public BatchedKernel {
 REGISTER_OP(Resize).frame_input("frame").frame_output("frame").stream_protobuf_name(
     "ResizeArgs");
 
-REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::CPU).num_devices(1);
+REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::CPU).batch().num_devices(1);
 
 #ifdef HAVE_CUDA
-REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::GPU).num_devices(1);
+REGISTER_KERNEL(Resize, ResizeKernel).device(DeviceType::GPU).batch().num_devices(1);
 #endif
 }

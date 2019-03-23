@@ -141,7 +141,7 @@ class DeviceTestBench:
     def test_cpu(self, sc):
         self.run(sc, DeviceType.CPU)
 
-    @needs_gpu
+    @needs_gpu()
     def test_gpu(self, sc):
         self.run(sc, DeviceType.GPU)
 
