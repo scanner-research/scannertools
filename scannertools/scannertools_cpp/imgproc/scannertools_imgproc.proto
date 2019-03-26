@@ -38,10 +38,6 @@ message ResizeArgs {
   string interpolation = 5;
 }
 
-message ImageEncoderArgs {
- string format = 1;
-}
-
 message ImageDecoderArgs {
   enum ImageType {
     PNG = 0;
