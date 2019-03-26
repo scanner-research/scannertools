@@ -2,7 +2,6 @@ set(SOURCES
   blur_kernel_cpu.cpp
   histogram_kernel_cpu.cpp
   montage_kernel_cpu.cpp
-  image_encoder_kernel_cpu.cpp
   image_decoder_kernel_cpu.cpp
   resize_kernel.cpp
   convert_color_kernel.cpp
