@@ -62,7 +62,7 @@ class ImageEncoderKernel : public BatchedKernel, public VideoKernel {
 
 REGISTER_OP(ImageEncoder)
     .frame_input("frame")
-    .output("img", ColumnType::Bytes, "EncodedImage")
+    .output("img", ColumnType::Bytes, "Image")
     .protobuf_name("ImageEncoderArgs");
 
 REGISTER_KERNEL(ImageEncoder, ImageEncoderKernel)
