@@ -17,9 +17,8 @@ def run(sc, op, name, device):
     s = now()
     sc.run(
         outp,
-        PerfParams.manual(500, 10000),
+        PerfParams.manual(500, 10000, pipeline_instances_per_node=1),
         cache_mode=CacheMode.Overwrite,
-        pipeline_instances_per_node=1,
         gpu_pool='8G')
     sc.table('qq').profiler().write_trace('{}.tar.gz'.format(name))
     print('{:.1f}s'.format(now() - s))

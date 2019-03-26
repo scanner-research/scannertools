@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-exit 0
-
 yes | docker login -u="$DOCKER_USER" -p="$DOCKER_PASS"
 
 docker build \
@@ -14,7 +12,7 @@ docker build \
 if [ "${TAG}" = "cpu" ];
 then
    docker run ${DOCKER_REPO}:${TAG}-latest bash \
-          -c "cd /opt/scannertools && python3 setup.py test"
+          -c "cd /opt/scannertools && ./scripts/test-all.sh"
 fi
 
 docker push ${DOCKER_REPO}:${TAG}-latest

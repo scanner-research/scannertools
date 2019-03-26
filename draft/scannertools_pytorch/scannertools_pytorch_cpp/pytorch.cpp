@@ -36,6 +36,10 @@ public:
       sigma_t_ = sigma_t_.to(torchdevice);
     }
 
+    at::Tensor dummy = torch::zeros({1, 3, 224, 224});
+    dummy = dummy.cuda();
+    module_->forward({dummy});
+
     result->set_success(true);
   }
 
@@ -82,10 +86,8 @@ public:
       normalized_tensor /= sigma_t_;
     }
 
-    std::vector<torch::jit::IValue> inputs;
-    inputs.push_back(normalized_tensor);
     auto start = now();
-    at::Tensor output = module_->forward(inputs).toTensor();
+    at::Tensor output = module_->forward({normalized_tensor}).toTensor();
     profiler_->add_interval("forward", start, now());
 
     {

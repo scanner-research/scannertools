@@ -42,7 +42,8 @@ def run_op(sc, op):
     faces = op(frame=gather_frame)
     output = NamedStream(sc, 'output')
     output_op = sc.io.Output(faces, [output])
-    sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1)
+    sc.run(output_op, PerfParams.estimate(pipeline_instances_per_node=1),
+           cache_mode=CacheMode.Overwrite, show_progress=False)
     return list(output.load())
 
 
@@ -57,7 +58,7 @@ def test_captions(sc):
     captions = sc.io.Input([CaptionStream(caption_path, window_size=10.0, max_time=3600)])
     ignored = sc.ops.DecodeCap(cap=captions)
     output = sc.io.Output(ignored, [NamedStream(sc, 'caption_test')])
-    sc.run(output, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, pipeline_instances_per_node=1)
+    sc.run(output, PerfParams.estimate(pipeline_instances_per_node=1), cache_mode=CacheMode.Overwrite)
 
 
 def test_files_source(sc):
@@ -227,6 +228,6 @@ def test_shot_detection(sc):
     output = NamedStream(sc, 'output')
     output_op = sc.io.Output(boundaries, [output])
     sc.run(
-        output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False, pipeline_instances_per_node=1,
-        work_packet_size=1000, io_packet_size=1000)
+        output_op, PerfParams.manual(work_packet_size=1000, io_packet_size=1000, pipeline_instances_per_node=1),
+        cache_mode=CacheMode.Overwrite, show_progress=False)
     assert len(next(output.load(rows=[0]))) == 7
