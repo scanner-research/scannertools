@@ -1,5 +1,5 @@
 from setuptools import setup
-from scannertools_infra import CMakeExtension, CMakeBuild
+from scannertools_infra import CMakeExtension, CMakeBuild, CudaInstallCommand, CudaDevelopCommand
 
 if __name__ == "__main__":
     setup(
@@ -14,6 +14,6 @@ if __name__ == "__main__":
         setup_requires=['pytest-runner', 'scannertools_infra'],
         tests_require=['pytest', 'psycopg2-binary == 2.7.6.1', 'testing.postgresql == 1.3.0',
                        'scannertools_infra'],
-        cmdclass=dict(build_ext=CMakeBuild),
+        cmdclass=dict(build_ext=CMakeBuild, install=CudaInstallCommand, develop=CudaDevelopCommand),
         ext_modules=[CMakeExtension('scannertools_sql', 'scannertools_sql_cpp')],
         zip_safe=False)

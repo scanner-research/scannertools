@@ -6,7 +6,10 @@ pip3 install -e .
 popd
 
 for subdir in scannertools*/ ; do
-    echo "Test: $subdir"
+    if [ "$subdir" = "scannertools_infra/"  ]; then
+        continue
+    fi
+
     pushd $subdir
     if [ "$tag2" = "cpu" ]; then
         CUDA_OPT=
