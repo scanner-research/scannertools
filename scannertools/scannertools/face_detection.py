@@ -1,11 +1,11 @@
 from scannerpy import DeviceType, FrameType, register_python_op, protobufs
 from scannerpy.types import BboxList
 from .tensorflow import TensorFlowKernel
-from typing import List
+from typing import Sequence
 import os.path
 import numpy as np
 
-@register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]])
+@register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=5)
 class MTCNNDetectFaces(TensorFlowKernel):
     def build_graph(self):
         import tensorflow as tf
@@ -14,7 +14,7 @@ class MTCNNDetectFaces(TensorFlowKernel):
         self._g_default = self.g.as_default()
         return self.g
 
-    def execute(self, frame: FrameType) -> BboxList:
+    def execute(self, frame: Sequence[FrameType]) -> Sequence[BboxList]:
         import align
         import align.detect_face
 
@@ -33,7 +33,7 @@ class MTCNNDetectFaces(TensorFlowKernel):
         out_size = 160
         detection_window_size_ratio = .2
 
-        imgs = [frame]
+        imgs = frame
         #print(('Face detect on {} frames'.format(len(imgs))))
         detections = align.detect_face.bulk_detect_face(
             imgs, detection_window_size_ratio, self.pnet, self.rnet, self.onet, threshold, factor)
@@ -65,4 +65,4 @@ class MTCNNDetectFaces(TensorFlowKernel):
 
             batch_faces.append(frame_faces)
 
-        return batch_faces[0]
+        return batch_faces
