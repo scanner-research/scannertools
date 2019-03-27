@@ -1,8 +1,8 @@
 from scannertools_infra.tests import sc, download_videos, needs_gpu
-from scannertools.storage.audio_storage import AudioStream
-from scannertools.storage.caption_storage import CaptionStream
-from scannertools.storage.python_storage import PythonStream
-from scannertools.storage.files_storage import FilesStream
+from scannertools.storage.audio import AudioStream
+from scannertools.storage.caption import CaptionStream
+from scannertools.storage.python import PythonStream
+from scannertools.storage.files import FilesStream
 import scannertools.imgproc
 import scannertools.misc
 import scannertools.storage
