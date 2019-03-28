@@ -3,7 +3,7 @@ from scannerpy.storage import NamedVideoStream, NamedStream
 from scannerpy import PerfParams, DeviceType
 import scannertools_caffe.pose_detection
 
-@needs_gpu
+@needs_gpu()
 def test_pose(sc):
     vid = [NamedVideoStream(sc, 'test1')]
     frame = sc.io.Input(vid)
