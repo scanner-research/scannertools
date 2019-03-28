@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+exit 0
+
 # Exit if this is a PR or not the CPU build
 if ! [ "$TRAVIS_PULL_REQUEST" = "false" -a "$TAG" = "cpu"]; then
     exit 0

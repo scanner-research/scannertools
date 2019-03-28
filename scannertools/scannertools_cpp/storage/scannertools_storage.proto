@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+message PackedFileEnumeratorArgs {
+  // For creating storehouse adapter
+  string storage_type = 1;
+  string bucket = 2;
+  string region = 3;
+  string endpoint = 4;
+  // Path to the file to read
+  string path = 5;
+}
+
+message PackedFileSourceArgs {
+  // For creating storehouse adapter
+  string storage_type = 1;
+  string bucket = 2;
+  string region = 3;
+  string endpoint = 4;
+}
+
+message PackedFileElementArgs {
+  // Path to read
+  string path = 1;
+  // Offset and size to read
+  uint64 offset = 2;
+  uint64 size = 3;
+}
+
+message PythonEnumeratorArgs {
+  // Pickled list of arguments
+  bytes data = 1;
+}
+
+message PythonSourceArgs {
+}
+
+message PythonElementArgs {
+  // Pickled argument
+  bytes data = 1;
+}
+
+
+message FilesEnumeratorArgs {
+  // For creating storehouse adapter
+  string storage_type = 1;
+  string bucket = 2;
+  string region = 3;
+  string endpoint = 4;
+  // Path to the files to read
+  repeated string paths = 5;
+}
+
+message FilesSourceArgs {
+  // For creating storehouse adapter
+  string storage_type = 1;
+  string bucket = 2;
+  string region = 3;
+  string endpoint = 4;
+}
+
+
+message FilesElementArgs {
+  // Path to read
+  string path = 1;
+}
+
+message FilesSinkArgs {
+  // For creating storehouse adapter
+  string storage_type = 1;
+  string bucket = 2;
+  string region = 3;
+  string endpoint = 4;
+}
+
+message FilesSinkStreamArgs {
+  // Path to read
+  repeated string paths = 1;
+}
+
+message AudioSourceArgs {
+}
+
+message AudioEnumeratorArgs {
+  string path = 1;
+  double frame_size = 2; // seconds
+  double duration = 3; // seconds
+}
+
+message AudioElementArgs {
+  string path = 1;
+  double frame_size = 2; // seconds
+}
+
+message CaptionsSourceArgs {
+}
+
+message CaptionsEnumeratorArgs {
+  string path = 1;
+  double window_size = 2; // seconds
+  double max_time = 3; // seconds
+}
+
+message CaptionsElementArgs {
+  string path = 1;
+  double window_size = 2; // seconds
+}
