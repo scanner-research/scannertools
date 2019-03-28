@@ -2,113 +2,59 @@
 
 Scannertools is a Python library of easy-to-use, off-the-shelf pipelines written using the [Scanner](https://github.com/scanner-research/scanner/) video processing engine. Scannertools provides implementations of:
 
-* [Object detection](https://github.com/scanner-research/scannertools/blob/master/examples/object_detection.py)
-* [Face detection](https://github.com/scanner-research/scannertools/blob/master/examples/face_detection.py)
-* [Face embedding](https://github.com/scanner-research/scannertools/blob/master/examples/face_embedding.py)
-* [Gender detection](https://github.com/scanner-research/scannertools/blob/master/examples/gender_detection.py)
-* [Pose detection](https://github.com/scanner-research/scannertools/blob/master/examples/pose_detection.py)
-* [Clothing detection](https://github.com/scanner-research/scannertools/blob/master/examples/clothing_detection.py)
-* [Optical flow](https://github.com/scanner-research/scannertools/blob/master/examples/optical_flow.py)
-* [Shot detection](https://github.com/scanner-research/scannertools/blob/master/examples/shot_detection.py)
-* [Random frame access](https://github.com/scanner-research/scannertools/blob/master/examples/frame_montage.py)
+* [Object detection](http://scanner.run/api/scannertools.html#object-detection)
+* [Face detection](http://scanner.run/api/scannertools.html#face-detection)
+* [Face embedding](http://scanner.run/api/scannertools.html#face-embedding)
+* [Gender detection](http://scanner.run/api/scannertools.html#gender-detection)
+* [Pose detection](http://scanner.run/api/scannertools.html#pose-detection)
+* [Optical flow](http://scanner.run/api/scannertools.html#optical-flow)
+* [Shot detection](http://scanner.run/api/scannertools.html#shot-detection)
 
-See the [documentation](https://scanner-research.github.io/scannertools/) for details.
-
-## Usage
-
-Here's an example using scannertools to extract faces in every 10th frame of a video, and then to draw the bounding boxes on one of those frames.
-
-```python
-from scannertools import face_detection, Video, imwrite
-import scannerpy
-import cv2
-
-def main():
-    # Get a reference to the video
-    video = Video('path/to/your/video.mp4')
-    frame_nums = list(range(0, video.num_frames(), 10))
-
-    # Run the face detection algorithm
-    db = scannerpy.Database()
-    face_bboxes = face_detection.detect_faces(db, videos=[video], frames=[frame_nums])
-
-    # Draw the bounding boxes
-    frame = video.frame(frame_nums[3])
-    for bbox in list(face_bboxes.load())[3]:
-        cv2.rectangle(
-            frame,
-            (int(bbox.x1 * video.width()), int(bbox.y1 * video.height())),
-            (int(bbox.x2 * video.width()), int(bbox.y2 * video.height())),
-            (255, 0, 0),
-            4)
-
-    # Save the image to disk
-    imwrite('example.jpg', frame)
-
-if __name__ == "__main__":
-    main()
-```
-
-For more examples, see the [examples](https://github.com/scanner-research/scannertools/tree/master/examples) directory. For the API reference, see our [documentation](https://scanner-research.github.io/scannertools/).
+See the documentation on [scanner.run](http://scanner.run/api.html#scannertools-the-scanner-standard-library) for more details.
 
 ## Installation
 
-Scannertools requires the Python packages for our three libraries [Scanner](https://github.com/scanner-research/scanner/), [Storehouse](https://github.com/scanner-research/storehouse/), and [Hwang](https://github.com/scanner-research/hwang) to be installed. Scannertools also has optional dependencies for certain pipelines, e.g. TensorFlow, OpenCV, and so on.
+You must have Scanner and all of its dependencies installed. See our [installation guide](http://scanner.run/guide/getting-started.html).
 
-### Docker
+Each subdirectory prefixed with "scannertools" is a module containing Python and C++ Scanner ops. The modules are separated because each expects different system dependencies:
 
-We recommend using our prebuilt Docker images for Scannertools ([`scannerresearch/scannertools`](https://hub.docker.com/r/scannerresearch/scanner/)). For example:
+* [scannertools](https://github.com/scanner-research/scannertools/tree/master/scannertools): no additional dependencies beyond Scanner.
+  * [scannertools.face_detection](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/face_detection.py) and [scannertools.face_embedding](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/face_embedding.py): depends on [Facenet](https://github.com/davidsandberg/facenet)
+  * [scannertools.gender_detection](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/gender_detection.py): depends on [rude-carnie](https://github.com/dpressel/rude-carnie)
+  * [scannertools.object_detection](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/object_detection.py): depends on [TensorFlow](https://www.tensorflow.org/)
+* [scannertools_caffe](https://github.com/scanner-research/scannertools/tree/master/scannertools_caffe): depends on [Caffe](http://caffe.berkeleyvision.org/installation.html).
+* [scannertools_sql](https://github.com/scanner-research/scannertools/tree/master/scannertools_sql): depends on [pqxx](https://github.com/jtv/libpqxx).
 
-```
-will@scannertools ~ ❯❯❯ docker run -v $(pwd):/app -ti scannerresearch/scannertools:cpu-latest bash
-root@7aec5a7d9198:/app# python3 /opt/scannertools/examples/face_detection.py
-...
-Wrote video with objects drawn to /app/sample_faces.mp4
-root@7aec5a7d9198:/app# exit
-will@scannertools ~ ❯❯❯ ls
-sample_faces.mp4
-```
+The [scannertools_infra](https://github.com/scanner-research/scannertools/tree/master/scannertools_infra) package contains build and test infrastructure for each of the scannertools submodules.
 
-If you want to use our GPU images, then you need to install [nvidia-docker](https://github.com/NVIDIA/nvidia-docker#quickstart). Then run Docker with the `--runtime nvidia` flag, e.g.
+### From pip
 
-```
-will@scannertools ~ ❯❯❯ docker run --runtime nvidia -v $(pwd):/app \
-    -ti scannerresearch/scannertools:gpu-9.0-cudnn7-latest bash
-```
+We'll be uploading pip packages soon. In the meantime, follow the install from source direction.
 
-### Native
+### From source
 
-To install from scratch, first follow the [installation instructions](https://github.com/scanner-research/scanner/blob/master/INSTALL.md) in the Scanner repository to get Scanner, Storehouse, and Hwang. Then run:
+First clone the repository and install the infrastructure.
 
 ```
-pip install scannertools
+git clone https://github.com/scanner-research/scannertools
+cd scannertools
+cd scannertools_infra
+pip3 install --user -e .
 ```
 
-You will need to download dependencies for different pipelines. Currently you need:
-* Face detection and face recognition: [facenet](https://github.com/davidsandberg/facenet)
-* Gender detection: [rude-carnie](https://github.com/dpressel/rude-carnie)
-* Clothing detection: `pip install torch==0.3.1 torchvision`
-* Face Landmark detection: `pip install torch==0.4.1` (note that pytorch version 0.4.1 has not been tested with clothing detection)
-
-See the [Dockerfile](https://github.com/scanner-research/scannertools/blob/master/Dockerfile) for how to set up the PYTHONPATH appropriately for these dependencies.
-
-Some of the kernels have C++ versions for performance reasons (see [this folder](https://github.com/scanner-research/scannertools/tree/master/scannertools/cpp_ops)). If you want to use those, you'll have to use our prebuilt Docker images or compile these from scratch.
-
-First, find the installation location:
+Then, for each submodule you want to install, go into the the subdirectory and run pip, e.g.:
 
 ```
-pip show scannertools
+cd scannertools_caffe
+pip3 install --user -e .
 ```
 
-The installation location should be displayed under `Location`. Then, run:
+To build the ops with GPU compatibility, pass the path to your CUDA installation:
 
 ```
-cd INSTALLATION_LOCATION
-cd scannertools/cpp_ops
-mkdir -p build
-cd build
-cmake ..
-make
+pip3 install --install-option="--build-cuda=/usr/local/cuda" --user -e .
 ```
 
-Now you should have access to the C++ kernels.
+## Usage
+
+See the documentation on [scanner.run](http://scanner.run/api.html#scannertools-the-scanner-standard-library) for usage.
