@@ -128,7 +128,7 @@ def test_sql_insert(sql_sc):
     output_op = sc.io.Output(
         row2, [SQLOutputStream(
             storage=storage, table='test2', job_name='test', insert=True)])
-    sc.run(output_op, show_progress=False, PerfParams.estimate())
+    sc.run(output_op, PerfParams.estimate())
 
     cur.execute('SELECT s FROM test2')
     assert cur.fetchone()[0] == "hello world"

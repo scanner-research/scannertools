@@ -16,6 +16,5 @@ set(LIBRARIES)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(libpqxx REQUIRED libpqxx)
-list(APPEND LIBRARIES "${libpqxx_LIBRARY_DIRS}/libpqxx.a" pq)
-
-target_link_libraries(scannertools_sql PUBLIC ${LIBRARIES})
+target_include_directories(scannertools_sql PUBLIC ${libpqxx_INCLUDE_DIRS})
+target_link_libraries(scannertools_sql PUBLIC "${libpqxx_LIBRARY_DIRS}/libpqxx.a" pq)
