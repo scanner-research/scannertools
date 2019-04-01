@@ -12,7 +12,7 @@ docker build \
 if [ "${TAG}" = "cpu" ];
 then
    docker run ${DOCKER_REPO}:${TAG}-latest bash \
-          -c "adduser --disabled-password --gecos \"\" user && su -c \"cd /opt/scannertools && ./scripts/test-all.sh\" user"
+          -c "adduser --disabled-password --gecos \"\" user && chown -R user /opt/scannertools && su -c \"cd /opt/scannertools && ./scripts/test-all.sh\" user"
 fi
 
 docker push ${DOCKER_REPO}:${TAG}-latest
