@@ -4,7 +4,7 @@ import psycopg2
 import scannerpy
 import json
 from scannertools_infra.tests import sc
-from scannerpy import protobufs
+from scannerpy import protobufs, PerfParams
 import scannertools_sql
 from scannertools_sql.storage import SQLStorage, SQLInputStream, SQLOutputStream
 
@@ -72,7 +72,7 @@ def test_sql(sql_sc):
         storage=storage,
         job_name='foobar',
         insert=False)])
-    sc.run(output_op)
+    sc.run(output_op, PerfParams.estimate())
 
     cur.execute('SELECT b FROM test')
     assert cur.fetchone()[0] == 11
@@ -101,7 +101,7 @@ def test_sql_grouped(sql_sc):
     row2 = sc.ops.AddAll(row=row)
     output_op = sc.io.Output(
         row2, [SQLOutputStream(storage=storage, table='test', job_name='test', insert=False)])
-    sc.run(output_op)
+    sc.run(output_op, PerfParams.estimate())
 
     cur.execute('SELECT b FROM test')
     assert cur.fetchone()[0] == 30
@@ -128,7 +128,7 @@ def test_sql_insert(sql_sc):
     output_op = sc.io.Output(
         row2, [SQLOutputStream(
             storage=storage, table='test2', job_name='test', insert=True)])
-    sc.run(output_op, show_progress=False)
+    sc.run(output_op, show_progress=False, PerfParams.estimate())
 
     cur.execute('SELECT s FROM test2')
     assert cur.fetchone()[0] == "hello world"
