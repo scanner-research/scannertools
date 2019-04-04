@@ -56,7 +56,7 @@ class FeatureExtractorKernel : public Kernel, public VideoKernel {
         if (args_.feature_type() == ExtractorType::SURF) {
           cvc::SURF_CUDA* surf = (cvc::SURF_CUDA*)gpu_extractor_;
           cvc::GpuMat img = frame_to_gpu_mat(frame_col.as_const_frame());
-          cvc::cvtColor(img, img, CV_RGB2GRAY);
+          cvc::cvtColor(img, img, cv::COLOR_RGB2GRAY);
           (*surf)(img, cvc::GpuMat(), kp_gpu, feat_gpus);
           surf->downloadKeypoints(kp_gpu, keypoints);
 
@@ -72,7 +72,7 @@ class FeatureExtractorKernel : public Kernel, public VideoKernel {
     } else {
       cv::Mat cv_features;
       cv::Mat img = frame_to_mat(frame_col.as_const_frame());
-      cv::cvtColor(img, img, CV_RGB2GRAY);
+      cv::cvtColor(img, img, cv::COLOR_RGB2GRAY);
       cpu_extractor_->detectAndCompute(img, cv::Mat(), keypoints,
                                        cv_features);
 

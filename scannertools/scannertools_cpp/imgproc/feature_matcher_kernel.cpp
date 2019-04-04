@@ -141,7 +141,7 @@ protected:
     }
     cv::Mat diff = dst_m - dst_proj_m;
     cv::Mat summed, sq;
-    reduce(diff.mul(diff), summed, 1, CV_REDUCE_SUM);
+    reduce(diff.mul(diff), summed, 1, cv::REDUCE_SUM);
     sqrt(summed, sq);
     return mean(sq)[0];
   }
@@ -178,7 +178,7 @@ protected:
       return C_.gamma;
     }
 
-    cv::Mat H = cv::findHomography(fr1, fr2, CV_RANSAC);
+    cv::Mat H = cv::findHomography(fr1, fr2, cv::RANSAC);
     // If H is empty, then homography could not be found
     if (H.rows == 0) {
       return C_.gamma;

@@ -67,7 +67,7 @@ class OpticalFlowKernelGPU : public StenciledBatchedKernel, public VideoKernel {
       i32 sidx = i % num_cuda_streams_;
       streams_[sidx].waitForCompletion();
       cvc::GpuMat input = frame_to_gpu_mat(input_frames[i]);
-      cvc::cvtColor(input, grayscale_[i], CV_BGR2GRAY, 0, streams_[sidx]);
+      cvc::cvtColor(input, grayscale_[i], cv::COLOR_BGR2GRAY, 0, streams_[sidx]);
     }
     for (auto& s : streams_) {
       s.waitForCompletion();

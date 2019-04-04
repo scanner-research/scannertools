@@ -149,7 +149,7 @@ void CaffeInputKernel::transform_caffe(u8* input_buffer, u8* output_buffer) {
   cv::resize(input_mat, resized_input,
              cv::Size(net_input_width_, net_input_height_), 0, 0,
              cv::INTER_LINEAR);
-  cv::cvtColor(resized_input, resized_input, CV_RGB2BGR);
+  cv::cvtColor(resized_input, resized_input, cv::COLOR_RGB2BGR);
   std::vector<cv::Mat> input_mats = {resized_input};
 
   caffe::Blob<f32> output_blob;
