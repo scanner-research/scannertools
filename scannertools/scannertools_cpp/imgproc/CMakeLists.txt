@@ -5,14 +5,12 @@ set(SOURCES
   image_decoder_kernel_cpu.cpp
   resize_kernel.cpp
   convert_color_kernel.cpp
-  feature_extractor_kernel.cpp
   optical_flow_kernel_cpu.cpp)
 
 if (BUILD_CUDA)
   list(APPEND SOURCES
     histogram_kernel_gpu.cpp
     montage_kernel_gpu.cpp
-    feature_matcher_kernel.cpp
     optical_flow_kernel_gpu.cpp)
     #image_decoder_kernel_gpu.cpp
 endif()
