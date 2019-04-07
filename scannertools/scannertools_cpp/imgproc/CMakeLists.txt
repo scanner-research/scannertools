@@ -23,7 +23,7 @@ build_op(
 
 set(LIBRARIES)
 
-list(APPEND OPENCV_COMPONENTS core highgui imgproc xfeatures2d)
+list(APPEND OPENCV_COMPONENTS core highgui imgproc optflow)
 if (BUILD_CUDA)
   list(APPEND OPENCV_COMPONENTS cudafeatures2d cudacodec cudaoptflow)
 endif()
