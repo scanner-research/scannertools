@@ -12,6 +12,20 @@ RUN git clone https://github.com/davidsandberg/facenet && \
     git clone https://github.com/scanner-research/rude-carnie
 ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 
+
+# Install pycocotools
+#RUN git clone https://github.com/cocodataset/cocoapi.git \
+# && cd cocoapi/PythonAPI \
+# && python3 setup.py build_ext install
+
+# Install PyTorch Detection
+RUN if [ "$tag2" = "cpu" ]; then ARG FORCE_CUDA="1" && ENV FORCE_CUDA=${FORCE_CUDA}; fi
+RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
+ && cd maskrcnn-benchmark \
+ && python3 setup.py build develop
+ENV PYTHONPATH /opt/cocoapi/PythonAPI:/opt/maskrcnn-benchmark:$PYTHONPATH
+
+
 RUN apt-get update && apt-get install -y jq
 
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk-xenial main" | \
@@ -21,7 +35,7 @@ RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk-xenial main" | \
 
 # https://github.com/keras-team/keras/issues/9567#issuecomment-370887563
 RUN if [ "$tag2" != "cpu" ]; then \
-    apt-get update && apt-get install -y --allow-downgrades --no-install-recommends \
+    apt-get update && apt-get install -y --allow-change-held-packages --allow-downgrades --no-install-recommends \
             libcudnn7=7.0.5.15-1+cuda9.0 \
             libcudnn7-dev=7.0.5.15-1+cuda9.0 && \
             rm -rf /var/lib/apt/lists/*; \
