@@ -24,7 +24,9 @@ if (BUILD_CUDA)
     caffe_kernel_gpu.cpp
     # Removed until halide '_halide_downgrade_buffer_t' symbol issue resolved
     #caffe_input_kernel_gpu.cpp
-    facenet_input_kernel_gpu.cpp)
+    # Removed until OpenCV4 GPU issue is resolved
+    #facenet_input_kernel_gpu.cpp
+    )
 endif()
 
 build_op(

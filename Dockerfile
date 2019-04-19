@@ -21,7 +21,7 @@ RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk-xenial main" | \
 
 # https://github.com/keras-team/keras/issues/9567#issuecomment-370887563
 RUN if [ "$tag2" != "cpu" ]; then \
-    apt-get update && apt-get install -y --allow-downgrades --no-install-recommends \
+    apt-get update && apt-get install -y --allow-downgrades --allow-change-held-packages --no-install-recommends \
             libcudnn7=7.0.5.15-1+cuda9.0 \
             libcudnn7-dev=7.0.5.15-1+cuda9.0 && \
             rm -rf /var/lib/apt/lists/*; \
