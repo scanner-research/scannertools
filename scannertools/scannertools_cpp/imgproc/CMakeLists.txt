@@ -7,6 +7,7 @@ set(SOURCES
   convert_color_kernel.cpp
   optical_flow_kernel_cpu.cpp)
 
+# Temporarily disable CUDA imgproc operations since opencv4 broke the build
 if (BUILD_CUDA)
   list(APPEND SOURCES
     histogram_kernel_gpu.cpp
@@ -24,8 +25,9 @@ build_op(
 set(LIBRARIES)
 
 list(APPEND OPENCV_COMPONENTS core highgui imgproc optflow)
+
 if (BUILD_CUDA)
-  list(APPEND OPENCV_COMPONENTS cudafeatures2d cudacodec cudaoptflow)
+  list(APPEND OPENCV_COMPONENTS cudafeatures2d cudacodec cudaoptflow cudawarping)
 endif()
 
 find_package(OpenCV REQUIRED COMPONENTS "${OPENCV_COMPONENTS}")

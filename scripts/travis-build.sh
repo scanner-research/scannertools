@@ -15,4 +15,9 @@ then
           -c "adduser --disabled-password --gecos \"\" user && chown -R user /opt/scannertools && su -c \"cd /opt/scannertools && ./scripts/test-all.sh\" user"
 fi
 
-docker push ${DOCKER_REPO}:${TAG}-latest
+
+if [[ "$TRAVIS_BRANCH" = "master" ]]; then
+    TRAVIS_TAG="latest"
+fi
+
+docker push ${DOCKER_REPO}:${TAG}-${TRAVIS_TAG}
