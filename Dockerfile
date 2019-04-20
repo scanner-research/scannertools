@@ -19,11 +19,11 @@ ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 # && python3 setup.py build_ext install
 
 # Install PyTorch Detection
-RUN if [ "$tag2" = "cpu" ]; then ARG FORCE_CUDA="1" && ENV FORCE_CUDA=${FORCE_CUDA}; fi
-RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
- && cd maskrcnn-benchmark \
- && python3 setup.py build develop
-ENV PYTHONPATH /opt/cocoapi/PythonAPI:/opt/maskrcnn-benchmark:$PYTHONPATH
+#RUN if [ "$tag2" = "cpu" ]; then ARG FORCE_CUDA="1" && ENV FORCE_CUDA=${FORCE_CUDA}; fi
+#RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
+# && cd maskrcnn-benchmark \
+# && python3 setup.py build develop
+#ENV PYTHONPATH /opt/cocoapi/PythonAPI:/opt/maskrcnn-benchmark:$PYTHONPATH
 
 
 RUN apt-get update && apt-get install -y jq
