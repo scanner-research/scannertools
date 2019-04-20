@@ -90,8 +90,11 @@ class OpenPoseKernel : public scanner::BatchedKernel,
       input_resolution = 656;
     }
 
+
+    const op::PoseModel poseModel = op::PoseModel::COCO_18;
+
     const op::WrapperStructPose wrapperStructPose{
-        true,
+        op::PoseMode::Enabled,
         {input_resolution, 368},
         {-1, -1},
         op::ScaleMode::ZeroToOne,
@@ -100,7 +103,7 @@ class OpenPoseKernel : public scanner::BatchedKernel,
         args_.pose_num_scales(),
         args_.pose_scale_gap(),
         op::RenderMode::None,
-        op::PoseModel::COCO_18,
+        poseModel,
         false,
         0.6,
         0.7,
@@ -111,24 +114,28 @@ class OpenPoseKernel : public scanner::BatchedKernel,
         false,
         0.05,
         -1,
+          false,
+          -1,
+          "",
+          "",
+          0,
         false};
+    opWrapper_.configure(wrapperStructPose);
 
     const op::WrapperStructFace wrapperStructFace{
-      args_.compute_face(), {368, 368}, op::RenderMode::None, 0.6, 0.7, 0.2};
+      args_.compute_face(), op::Detector::Body, {368, 368}, op::RenderMode::None, 0.6, 0.7, 0.2};
+    opWrapper_.configure(wrapperStructFace);
 
     const op::WrapperStructHand wrapperStructHand{args_.compute_hands(),
+                                                  op::Detector::Body,
                                                   {368, 368},
                                                   args_.hand_num_scales(),
                                                   args_.hand_scale_gap(),
-                                                  false,
                                                   op::RenderMode::None,
                                                   0.6,
                                                   0.7,
                                                   0.2};
-
-    opWrapper_.configure(wrapperStructPose, wrapperStructFace,
-                         wrapperStructHand, op::WrapperStructInput{},
-                         op::WrapperStructOutput{});
+    opWrapper_.configure(wrapperStructHand);
     opWrapper_.start();
 
     result->set_success(true);
@@ -138,7 +145,7 @@ class OpenPoseKernel : public scanner::BatchedKernel,
                scanner::BatchedElements& output_columns) override {
     auto& frame_col = input_columns[0];
 
-    auto datumsPtr = std::make_shared<std::vector<op::Datum>>();
+    auto datumsPtr = std::make_shared<std::vector<std::shared_ptr<op::Datum>>>();
     for (int i = 0; i < num_rows(frame_col); ++i) {
       datumsPtr->emplace_back();
       auto& datum = datumsPtr->at(datumsPtr->size() - 1);
@@ -146,22 +153,22 @@ class OpenPoseKernel : public scanner::BatchedKernel,
         CUDA_PROTECT({
           cv::cuda::GpuMat gpu_input =
               scanner::frame_to_gpu_mat(frame_col[i].as_const_frame());
-          datum.cvInputData = cv::Mat(gpu_input);
+          datum->cvInputData = cv::Mat(gpu_input);
         });
       } else {
-        datum.cvInputData =
+        datum->cvInputData =
             scanner::frame_to_mat(frame_col[i].as_const_frame());
       }
     }
 
     bool emplaced = opWrapper_.waitAndEmplace(datumsPtr);
     LOG_IF(FATAL, !emplaced) << "Failed to emplace pose work";
-    std::shared_ptr<std::vector<op::Datum>> datumProcessed;
+    std::shared_ptr<std::vector<std::shared_ptr<op::Datum>>> datumProcessed;
     bool popped = opWrapper_.waitAndPop(datumProcessed);
     LOG_IF(FATAL, !popped) << "Failed to pop pose results";
 
     for (auto& datum : *datumProcessed) {
-      int num_people = datum.poseKeypoints.getSize(0);
+      int num_people = datum->poseKeypoints.getSize(0);
       size_t size =
           num_people > 0 ? (POSE_SCORES + TOTAL_KEYPOINTS * 3) * num_people * sizeof(float) : 1 * sizeof(float);
       float* kp = new float[size / sizeof(float)];
@@ -170,29 +177,29 @@ class OpenPoseKernel : public scanner::BatchedKernel,
 
       for (int i = 0; i < num_people; ++i) {
         std::memcpy(curr_kp,
-                    datum.poseScores.getPtr() + i * POSE_SCORES,
+                    datum->poseScores.getPtr() + i * POSE_SCORES,
                     POSE_SCORES * sizeof(float));
         curr_kp += POSE_SCORES;
 
         std::memcpy(curr_kp,
-                    datum.poseKeypoints.getPtr() + i * POSE_KEYPOINTS * 3,
+                    datum->poseKeypoints.getPtr() + i * POSE_KEYPOINTS * 3,
                     POSE_KEYPOINTS * 3 * sizeof(float));
         curr_kp += POSE_KEYPOINTS * 3;
-        if (datum.faceKeypoints.getPtr() != nullptr) {
+        if (datum->faceKeypoints.getPtr() != nullptr) {
           std::memcpy(curr_kp,
-                      datum.faceKeypoints.getPtr() + i * FACE_KEYPOINTS * 3,
+                      datum->faceKeypoints.getPtr() + i * FACE_KEYPOINTS * 3,
                       FACE_KEYPOINTS * 3 * sizeof(float));
         }
         curr_kp += FACE_KEYPOINTS * 3;
-        if (datum.handKeypoints[0].getPtr() != nullptr) {
+        if (datum->handKeypoints[0].getPtr() != nullptr) {
           std::memcpy(curr_kp,
-                      datum.handKeypoints[0].getPtr() + i * HAND_KEYPOINTS * 3,
+                      datum->handKeypoints[0].getPtr() + i * HAND_KEYPOINTS * 3,
                       HAND_KEYPOINTS * 3 * sizeof(float));
         }
         curr_kp += HAND_KEYPOINTS * 3;
-        if (datum.handKeypoints[1].getPtr() != nullptr) {
+        if (datum->handKeypoints[1].getPtr() != nullptr) {
           std::memcpy(curr_kp,
-                      datum.handKeypoints[1].getPtr() + i * HAND_KEYPOINTS * 3,
+                      datum->handKeypoints[1].getPtr() + i * HAND_KEYPOINTS * 3,
                       HAND_KEYPOINTS * 3 * sizeof(float));
         }
         curr_kp += HAND_KEYPOINTS * 3;
@@ -209,7 +216,7 @@ class OpenPoseKernel : public scanner::BatchedKernel,
  private:
   proto::OpenPoseArgs args_;
   scanner::DeviceHandle device_;
-  op::Wrapper<std::vector<op::Datum>> opWrapper_;
+  op::Wrapper opWrapper_;
 };
 
 REGISTER_OP(OpenPose).frame_input("frame").output("pose", ColumnType::Bytes, "PoseList").protobuf_name(

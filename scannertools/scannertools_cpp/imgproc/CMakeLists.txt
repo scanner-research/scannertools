@@ -8,7 +8,7 @@ set(SOURCES
   optical_flow_kernel_cpu.cpp)
 
 # Temporarily disable CUDA imgproc operations since opencv4 broke the build
-if (BUILD_CUDA AND FALSE)
+if (BUILD_CUDA)
   list(APPEND SOURCES
     histogram_kernel_gpu.cpp
     montage_kernel_gpu.cpp
@@ -19,8 +19,8 @@ endif()
 build_op(
   LIB_NAME scannertools_imgproc
   CPP_SRCS ${SOURCES}
-  PROTO_SRC scannertools_imgproc.proto)
-  #BUILD_CUDA ${BUILD_CUDA})
+  PROTO_SRC scannertools_imgproc.proto
+  BUILD_CUDA ${BUILD_CUDA})
 
 set(LIBRARIES)
 
