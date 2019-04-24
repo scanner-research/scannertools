@@ -27,7 +27,7 @@ from maskrcnn_benchmark.utils import cv2_util
 CONFIG_FILE = "/opt/maskrcnn-benchmark/configs/caffe2/e2e_mask_rcnn_X_101_32x8d_FPN_1x_caffe2.yaml"
 
 @scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=5)
-class MaskRCNNSegmentObjects(Kernel):
+class MaskRCNNDetectObjects(Kernel):
     def __init__(self, 
         config,
     ):
