@@ -6,25 +6,23 @@ WORKDIR /opt
 
 # Fixes travis pip failure
 RUN rm /usr/share/python-wheels/urllib3-1.13.1-py2.py3-none-any.whl && pip3 install requests[security] --upgrade
-RUN pip3 install torch torchvision face-alignment scipy pysrt
+RUN pip3 install face-alignment scipy pysrt
 RUN if [ "$tag2" = "cpu" ]; then pip3 install tensorflow==1.12.0; else pip3 install tensorflow-gpu==1.12.0; fi
 RUN git clone https://github.com/davidsandberg/facenet && \
     git clone https://github.com/scanner-research/rude-carnie
 ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 
-
-# Install pycocotools
-#RUN git clone https://github.com/cocodataset/cocoapi.git \
-# && cd cocoapi/PythonAPI \
-# && python3 setup.py build_ext install
+# pytorch (specific version for maskRCNN)
+RUN pip3 install torchvision_nightly
+RUN pip3 install torch_nightly -f https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html
 
 # Install PyTorch Detection
-#RUN if [ "$tag2" = "cpu" ]; then ARG FORCE_CUDA="1" && ENV FORCE_CUDA=${FORCE_CUDA}; fi
-#RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
-# && cd maskrcnn-benchmark \
-# && python3 setup.py build develop
-#ENV PYTHONPATH /opt/cocoapi/PythonAPI:/opt/maskrcnn-benchmark:$PYTHONPATH
-
+ARG FORCE_CUDA="1"
+ENV FORCE_CUDA=${FORCE_CUDA}
+RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
+ && cd maskrcnn-benchmark \
+ && python3 setup.py build develop
+ENV PYTHONPATH /opt/maskrcnn-benchmark:$PYTHONPATH
 
 RUN apt-get update && apt-get install -y jq
 
