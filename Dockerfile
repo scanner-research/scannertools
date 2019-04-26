@@ -17,8 +17,7 @@ RUN pip3 install torchvision_nightly
 RUN pip3 install torch_nightly -f https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html
 
 # Install PyTorch Detection
-ARG FORCE_CUDA="1"
-ENV FORCE_CUDA=${FORCE_CUDA}
+RUN if [ "$tag2" != "cpu" ]; then ARG FORCE_CUDA="1" && ENV FORCE_CUDA=${FORCE_CUDA}; fi
 RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
  && cd maskrcnn-benchmark \
  && python3 setup.py build develop
