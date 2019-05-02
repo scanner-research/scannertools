@@ -160,162 +160,7 @@ class MaskRCNNDetectObjects(Kernel):
                 'label' : label.numpy(), 'score' : score.numpy()}
                 for (bbox, mask, label, score) in zip(pred.bbox, pred.get_field("mask"), pred.get_field("labels"), pred.get_field("scores")) ]
                 for pred in top_predictions]
-        # import cloudpickle
-        # print(len(cloudpickle.dumps(result)))
-        # print(len(result))
-        # print([len(res) for res in result])
         return result
-
-
-##################################################################################################
-# Driver Functions                                                                               #
-##################################################################################################
-
-# # Intersection Over Union (Area)
-# def IoU(box1, box2):
-#     # intersection rectangle (y1, x1, y2, x2)
-#     y1 = max(box1[0], box2[0])
-#     x1 = max(box1[1], box2[1])
-#     y2 = min(box1[2], box2[2])
-#     x2 = min(box1[3], box2[3])
-#     area_intersection = (x2 - x1) * (y2 - y1)
-
-#     area_box1 = (box1[3] - box1[1]) * (box1[2] - box1[0])
-#     area_box2 = (box2[3] - box2[1]) * (box2[2] - box2[0])
-
-#     area_union = area_box1 + area_box2 - area_intersection
-
-#     return area_intersection * 1.0 / area_union
-
-
-# # non-maximum suppression
-# def nms_single(bundled_data, iou_threshold=0.5):
-#     bundled_data = bundled_data.reshape(20, 6)
-#     data_size = len(bundled_data)
-#     repeated_indices = []
-#     selected_indices = set(range(data_size))
-
-#     [boxes, classes, scores] = np.split(bundled_data, [4, 5], axis=1)
-
-#     for i in range(data_size):
-#         for j in range(i + 1, data_size):
-#             if IoU(boxes[i],
-#                    boxes[j]) > iou_threshold and classes[i] == classes[j]:
-#                 repeated_indices.append(j)
-
-#     repeated_indices = set(repeated_indices)
-#     selected_indices = list(selected_indices - repeated_indices)
-
-#     selected_bundled_data = np.take(bundled_data, selected_indices, axis=0)
-#     [boxes_np, classes_np, scores_np] = np.split(
-#         selected_bundled_data, [4, 5], axis=1)
-
-#     return [boxes_np, classes_np, scores_np]
-
-
-# # tried to use multiprocessing module to scale,
-# # but doesn't work well because of high overhead cost
-# def nms_bulk(bundled_data_list):
-#     print("Working on non-maximum suppression...")
-#     bundled_np_list = [
-#         nms_single(bundled_data) for bundled_data in tqdm(bundled_data_list)
-#     ]
-#     print("Finished non-maximum suppression!")
-#     return bundled_np_list
-
-
-# def neighbor_boxes(box1, box2, threshold=0.1):
-#     r"""This method returns whether two boxes are close enough.
-#     If two boxes from two neighboring frames are considered
-#     close enough, they are refered as the same object.
-#     """
-
-#     if math.abs(box1[0] - box2[0]) > threshold:
-#         return False
-#     if math.abs(box1[1] - box2[1]) > threshold:
-#         return False
-#     if math.abs(box1[2] - box2[2]) > threshold:
-#         return False
-#     if math.abs(box1[3] - box2[3]) > threshold:
-#         return False
-#     return True
-
-
-# def smooth_box(bundled_np_list, min_score_thresh=0.5):
-#     r"""If you knew which boxes in consecutive frames were the same object,
-#     you could "smooth" out of the box positions over time.
-#     For example, the box position at frame t could be the average of
-#     the positions in surrounding frames:
-#     box_t = (box_(t-1) + box_t + box_(t+1)) / 3
-#     """
-#     print("Working on making boxes smooth...")
-
-#     for i, now in enumerate(tqdm(bundled_np_list)):
-#         # Ignore the first and last frame
-#         if i == 0:
-#             before = None
-#             continue
-#         else:
-#             before = bundled_np_list[i - 1]
-
-#         if i == len(bundled_np_list) - 1:
-#             after = None
-#             continue
-#         else:
-#             after = bundled_np_list[i + 1]
-
-#         [boxes_after, classes_after, scores_after] = after
-#         [boxes_before, classes_before, scores_before] = before
-#         [boxes_now, classes_now, scores_now] = now
-
-#         for j, [box_now, class_now, score_now] in enumerate(
-#                 zip(boxes_now, classes_now, scores_now)):
-
-#             # Assume that the boxes list is already sorted
-#             if score_now < min_score_thresh:
-#                 break
-
-#             confirmed_box_after = None
-#             confirmed_box_before = None
-
-#             for k, [box_after, class_after, score_after] in enumerate(
-#                     zip(boxes_after, classes_after, scores_after)):
-#                 if (IoU(box_now, box_after) > 0.3 and
-#                     class_now == class_after and
-#                     score_after > min_score_thresh - 0.1):
-
-#                     confirmed_box_after = box_after
-#                     if score_after < min_score_thresh:
-#                         scores_after[k] = score_now
-#                     break
-
-#             for k, [box_before, class_before, score_before] in enumerate(
-#                     zip(boxes_before, classes_before, scores_before)):
-#                 if IoU(box_now,
-#                        box_before) > 0.3 and class_now == class_before:
-#                     confirmed_box_before = box_before
-#                     break
-
-#             if confirmed_box_before is not None and confirmed_box_after is not None:
-#                 box_now += box_now
-#                 box_now += confirmed_box_before
-#                 box_now += confirmed_box_after
-#                 box_now /= 4.0
-#             elif confirmed_box_before is not None:
-#                 box_now += confirmed_box_before
-#                 box_now /= 2.0
-#             elif confirmed_box_after is not None:
-#                 box_now += confirmed_box_after
-#                 box_now /= 2.0
-
-#             boxes_now[j] = box_now
-
-#         bundled_np_list[i] = [boxes_now, classes_now, scores_now]
-#         bundled_np_list[i + 1] = [boxes_after, classes_after, scores_after]
-#         bundled_np_list[i - 1] = [boxes_before, classes_before, scores_before]
-
-#     print("Finished making boxes smooth!")
-#     return bundled_np_list
 
 
 ##################################################################################################
@@ -415,10 +260,12 @@ CATEGORIES = [
         "toothbrush",]
 
 
-def visualize_labels(image, metadata, min_score_thresh=0.5, mask_shrink=4):
+def visualize_labels(image, metadata, min_score_thresh=0.5, mask_shrink=4, blending_alpha=0.5):
+    if len(metadata) == 0:
+        return 
     scores = [obj['score'] for obj in metadata]
-    boxes = [obj['bbox'] for obj in metadata]
-    masks = [obj['mask'] for obj in metadata]
+    boxes = [obj['bbox'] for obj in metadata] if 'bbox' in metadata[0] else [None] * len(metadata)
+    masks = [obj['mask'] for obj in metadata] if 'mask' in metadata[0] else [None] * len(metadata)
     labels = [obj['label'] for obj in metadata]
     colors = compute_colors_for_labels(labels).tolist()
     labels = [CATEGORIES[i] for i in labels]
@@ -427,29 +274,40 @@ def visualize_labels(image, metadata, min_score_thresh=0.5, mask_shrink=4):
         if score < min_score_thresh:
             continue
 
-        # overlay bbox   
-        top_left = (box['x1'], box['y1'])
-        bottom_right = (box['x2'], box['y2'])
-        image = cv2.rectangle(
-            image, top_left, bottom_right, tuple(color), 3
-        )
+        # overlay bbox 
+        if not box is None:  
+            if 'x1' in box:
+                top_left = (box['x1'], box['y1']) 
+                bottom_right = (box['x2'], box['y2'])
+            else:
+                top_left = (box[0], box[1]) 
+                bottom_right = (box[2], box[3])
+            image = cv2.rectangle(image, top_left, bottom_right, tuple(color), 3)
 
-        # overlay mask contour
-        H, W =  mask.shape  
-        mask_large = cv2.resize(mask, (W * mask_shrink, H * mask_shrink))
-        thresh = (mask_large[..., None] > 0).astype(np.uint8) 
-        contours, hierarchy = cv2_util.findContours(
-            thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )
-        image = cv2.drawContours(image, contours, -1, color, 3)
+        # overlay mask
+        if not mask is None:
+            H, W =  mask.shape  
+            mask_large = cv2.resize(mask, (W * mask_shrink, H * mask_shrink))
+            for c in range(3):
+                image[:, :, c] = np.where(mask_large > 0,
+                                          image[:, :, c] * (1 - blending_alpha) + color[c] * blending_alpha,
+                                          image[:, :, c])
+            # draw mask contour
+            # thresh = (mask_large[..., None] > 0).astype(np.uint8) 
+            # contours, hierarchy = cv2_util.findContours(
+            #     thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+            # )
+            # image = cv2.drawContours(image, contours, -1, color, 3)
 
         # overlap class name
-        template = "{}: {:.2f}"
-        x, y = box['x1'], box['y1']
-        s = template.format(label, score)
-        cv2.putText(
-            image, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3
-        )
+        if not box is None:
+            template = "{}: {:.2f}"
+            if 'x1' in box:
+                x, y = box['x1'], box['y1']
+            else:
+                x, y = box[0], box[1]
+            s = template.format(label, score)
+            cv2.putText(image, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
 
 
 def compute_colors_for_labels(labels):
