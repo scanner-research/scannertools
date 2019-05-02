@@ -10,5 +10,5 @@ if __name__ == "__main__":
         author_email='wcrichto@cs.stanford.edu',
         license='Apache 2.0',
         packages=['scannertools_infra'],
-        install_requires=['pytest', 'toml', 'requests', 'scipy'],
+        install_requires=['pytest', 'toml', 'requests', 'scipy', 'tensorflow', 'pandas'],
         zip_safe=False)
