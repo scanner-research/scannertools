@@ -8,7 +8,7 @@ WORKDIR /opt
 RUN rm /usr/share/python-wheels/urllib3-1.13.1-py2.py3-none-any.whl && pip3 install requests[security] --upgrade
 RUN pip3 install face-alignment scipy pysrt
 RUN if [ "$tag2" = "cpu" ]; then pip3 install tensorflow==1.12.0; else pip3 install tensorflow-gpu==1.12.0; fi
-RUN git clone https://github.com/davidsandberg/facenet && \
+RUN git clone https://github.com/scanner-research/facenet && \
     git clone https://github.com/scanner-research/rude-carnie
 ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 
