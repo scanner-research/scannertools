@@ -27,6 +27,8 @@ Each subdirectory prefixed with "scannertools" is a module containing Python and
 
 The [scannertools_infra](https://github.com/scanner-research/scannertools/tree/master/scannertools_infra) package contains build and test infrastructure for each of the scannertools submodules.
 
+To install the optional dependencies that scannertools use, first clone the dependency repo and then add the source to the python pyath.
+
 ### From pip
 
 We'll be uploading pip packages soon. In the meantime, follow the install from source direction.
