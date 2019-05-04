@@ -23,6 +23,8 @@ from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark import layers as L
 from maskrcnn_benchmark.utils import cv2_util
 
+import pycocotools.mask as mask_util
+
 
 CONFIG_FILE = "/opt/maskrcnn-benchmark/configs/caffe2/e2e_mask_rcnn_X_101_32x8d_FPN_1x_caffe2.yaml"
 
@@ -33,7 +35,7 @@ class MaskRCNNDetectObjects(Kernel):
     ):
         self.confidence_threshold = 0.5
         self.min_image_size = 800
-        self.mask_shrink = 4
+        # self.mask_shrink = 4
         
         # set cpu/gpu
         self.cpu_only = True
@@ -149,15 +151,18 @@ class MaskRCNNDetectObjects(Kernel):
             _, idx = scores.sort(0, descending=True)
             top_predictions += [pred[idx]]
 
-        def resize_mask(mask):
-            H, W = mask.shape
-            mask_small = cv2.resize(mask, (W // self.mask_shrink, H // self.mask_shrink))
-            mask_small = (mask_small > 0).astype(np.uint8) * 255
-            return mask_small
+        # def resize_mask(mask):
+        #     H, W = mask.shape
+        #     mask_small = cv2.resize(mask, (W // self.mask_shrink, H // self.mask_shrink))
+        #     mask_small = (mask_small > 0).astype(np.uint8) * 255
+        #     return mask_small
 
-        result = [[{'bbox': {'x1' : bbox.numpy()[0], 'y1': bbox.numpy()[1], 'x2' : bbox.numpy()[2], 'y2' : bbox.numpy()[3]},
-                'mask' : resize_mask(mask.numpy()[0]), 
-                'label' : label.numpy(), 'score' : score.numpy()}
+        def encode_mask(mask):
+            return mask_util.encode(np.asfortranarray(mask.transpose(1, 2, 0)))[0]
+
+        result = [[{'bbox': {'x1' : float(bbox[0]), 'y1': float(bbox[1]), 'x2' : float(bbox[2]), 'y2' : float(bbox[3])},
+                'mask' : encode_mask(mask.numpy()), 
+                'label' : float(label), 'score' : float(score)}
                 for (bbox, mask, label, score) in zip(pred.bbox, pred.get_field("mask"), pred.get_field("labels"), pred.get_field("scores")) ]
                 for pred in top_predictions]
         return result
@@ -260,7 +265,7 @@ CATEGORIES = [
         "toothbrush",]
 
 
-def visualize_labels(image, metadata, min_score_thresh=0.5, mask_shrink=4, blending_alpha=0.5):
+def visualize_labels(image, metadata, min_score_thresh=0.5, blending_alpha=0.5):
     if len(metadata) == 0:
         return 
     scores = [obj['score'] for obj in metadata]
@@ -268,28 +273,30 @@ def visualize_labels(image, metadata, min_score_thresh=0.5, mask_shrink=4, blend
     masks = [obj['mask'] for obj in metadata] if 'mask' in metadata[0] else [None] * len(metadata)
     labels = [obj['label'] for obj in metadata]
     colors = compute_colors_for_labels(labels).tolist()
-    labels = [CATEGORIES[i] for i in labels]
+    labels = [CATEGORIES[int(i)] for i in labels]
     
     for score, box, mask, label, color in zip(scores, boxes, masks, labels, colors):
         if score < min_score_thresh:
             continue
 
-        # overlay bbox 
+        # draw bbox 
         if not box is None:  
             if 'x1' in box:
-                top_left = (box['x1'], box['y1']) 
-                bottom_right = (box['x2'], box['y2'])
+                top_left = (int(box['x1']), int(box['y1'])) 
+                bottom_right = (int(box['x2']), int(box['y2']))
             else:
-                top_left = (box[0], box[1]) 
-                bottom_right = (box[2], box[3])
+                top_left = (int(box[0]), int(box[1])) 
+                bottom_right = (int(box[2]), int(box[3]))
             image = cv2.rectangle(image, top_left, bottom_right, tuple(color), 3)
 
-        # overlay mask
+        
         if not mask is None:
-            H, W =  mask.shape  
-            mask_large = cv2.resize(mask, (W * mask_shrink, H * mask_shrink))
+            # H, W =  mask.shape  
+            # mask_large = cv2.resize(mask, (W * mask_shrink, H * mask_shrink))
+            mask = mask_util.decode([mask])[..., 0]
+            # overlay mask
             for c in range(3):
-                image[:, :, c] = np.where(mask_large > 0,
+                image[:, :, c] = np.where(mask > 0,
                                           image[:, :, c] * (1 - blending_alpha) + color[c] * blending_alpha,
                                           image[:, :, c])
             # draw mask contour
@@ -299,13 +306,13 @@ def visualize_labels(image, metadata, min_score_thresh=0.5, mask_shrink=4, blend
             # )
             # image = cv2.drawContours(image, contours, -1, color, 3)
 
-        # overlap class name
+        # draw class name
         if not box is None:
             template = "{}: {:.2f}"
             if 'x1' in box:
-                x, y = box['x1'], box['y1']
+                x, y = int(box['x1']), int(box['y1'])
             else:
-                x, y = box[0], box[1]
+                x, y = int(box[0]), int(box[1])
             s = template.format(label, score)
             cv2.putText(image, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
 

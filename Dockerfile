@@ -24,6 +24,13 @@ RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
  && python3 setup.py build develop
 ENV PYTHONPATH /opt/maskrcnn-benchmark:$PYTHONPATH
 
+# Install COCO API
+RUN git clone https://github.com/scanner-research/cocoapi.git \
+ && cd cocoapi/PythonAPI \
+ && pip3 install Cython \
+ && python3 setup.py build_ext install \
+ && rm -rf build
+
 RUN apt-get update && apt-get install -y jq
 
 RUN echo "deb http://packages.cloud.google.com/apt cloud-sdk-xenial main" | \
