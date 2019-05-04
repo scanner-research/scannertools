@@ -19,7 +19,7 @@ You must have Scanner and all of its dependencies installed. See our [installati
 Each subdirectory prefixed with "scannertools" is a module containing Python and C++ Scanner ops. The modules are separated because each expects different system dependencies:
 
 * [scannertools](https://github.com/scanner-research/scannertools/tree/master/scannertools): no additional dependencies beyond Scanner.
-  * [scannertools.face_detection](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/face_detection.py) and [scannertools.face_embedding](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/face_embedding.py): depends on [Facenet](https://github.com/davidsandberg/facenet)
+  * [scannertools.face_detection](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/face_detection.py) and [scannertools.face_embedding](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/face_embedding.py): depends on [Facenet](https://github.com/scanner-research/facenet)
   * [scannertools.gender_detection](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/gender_detection.py): depends on [rude-carnie](https://github.com/dpressel/rude-carnie)
   * [scannertools.object_detection](https://github.com/scanner-research/scannertools/blob/master/scannertools/scannertools/object_detection.py): depends on [TensorFlow](https://www.tensorflow.org/)
 * [scannertools_caffe](https://github.com/scanner-research/scannertools/tree/master/scannertools_caffe): depends on [Caffe](http://caffe.berkeleyvision.org/installation.html).
