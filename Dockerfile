@@ -12,23 +12,17 @@ RUN git clone https://github.com/scanner-research/facenet && \
     git clone https://github.com/scanner-research/rude-carnie
 ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 
-# pytorch (specific version for maskRCNN)
+# Install Pytorch 1.0 (Caffe2 included)
 RUN pip3 install torchvision_nightly
 RUN pip3 install torch_nightly -f https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html
 
-# Install PyTorch Detection
-ARG FORCE_CUDA="1"
-ENV FORCE_CUDA=${FORCE_CUDA}
+# Install maskrcnn-benchmark
+ARG force_cuda
+ENV FORCE_CUDA=${force_cuda}
 RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
  && cd maskrcnn-benchmark \
  && python3 setup.py build develop
 ENV PYTHONPATH /opt/maskrcnn-benchmark:$PYTHONPATH
-
-# Install the COCO API
-RUN git clone https://github.com/cocodataset/cocoapi.git \
- && cd cocoapi/PythonAPI \
- && python3 setup.py build_ext install \
- && rm -rf build
 
 RUN apt-get update && apt-get install -y jq
 
