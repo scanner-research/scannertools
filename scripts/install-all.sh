@@ -16,6 +16,6 @@ for subdir in scannertools*/ ; do
     else
         CUDA_OPT=--install-option="--build-cuda=/usr/local/cuda"
     fi
-    pip3 install ${CUDA_OPT} -e .
+    pip3 install -v ${CUDA_OPT} -e .
     popd
 done
