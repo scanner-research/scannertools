@@ -7,7 +7,7 @@ WORKDIR /opt
 # Fixes travis pip failure
 RUN rm /usr/share/python-wheels/urllib3-1.13.1-py2.py3-none-any.whl && \
     rm /usr/share/python-wheels/requests-2.9.1-py2.py3-none-any.whl && \
-    pip3 install requests[security] --upgrade
+    pip3 install requests[security] --upgrade -v
 RUN pip3 install face-alignment scipy pysrt
 RUN if [ "$tag2" = "cpu" ]; then pip3 install tensorflow==1.12.0; else pip3 install tensorflow-gpu==1.12.0; fi
 RUN git clone https://github.com/scanner-research/facenet && \
