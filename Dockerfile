@@ -4,6 +4,8 @@ ARG tag2
 
 WORKDIR /opt
 
+# Avoid pip timeouts on travis
+ENV PIP_DEFAULT_TIMEOUT=300
 # Fixes travis pip failure
 RUN rm /usr/share/python-wheels/urllib3-1.13.1-py2.py3-none-any.whl && pip3 install requests[security] --upgrade
 RUN pip3 install face-alignment scipy pysrt
