@@ -24,12 +24,21 @@ RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
  && python3 setup.py build develop
 ENV PYTHONPATH /opt/maskrcnn-benchmark:$PYTHONPATH
 
-# Install COCO API
+# Install cocoapi
 RUN git clone https://github.com/scanner-research/cocoapi.git \
  && cd cocoapi/PythonAPI \
  && pip3 install Cython \
  && python3 setup.py build_ext install \
  && rm -rf build
+
+# Install DensePose
+RUN git clone -b python3 https://github.com/scanner-research/DensePose.git \
+ && cd DensePose \
+ && pip3 install -r requirements.txt \
+ && make \
+#&&make ops \
+ && cd DensePoseData && bash get_densepose_uv.sh \
+ENV PYTHONPATH /opt/DensePose:$PYTHONPATH
 
 RUN apt-get update && apt-get install -y jq
 
@@ -47,6 +56,6 @@ RUN if [ "$tag2" != "cpu" ]; then \
     fi
 
 COPY . scannertools
-RUN cd scannertools && pip3 install --upgrade setuptools && ./scripts/install-all.sh
+RUN cd scannertools && pip3 install --upgrade setuptools #&& ./scripts/install-all.sh
 
 WORKDIR /app
