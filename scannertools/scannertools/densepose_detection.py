@@ -40,8 +40,9 @@ MODEL_FILE = "https://dl.fbaipublicfiles.com/densepose/DensePoseKeyPointsMask_Re
 class DensePoseDetectPerson(Kernel):
     def __init__(self, 
         config,
+        confidence_threshold=0.5
     ):
-        self.min_score_thresh = 0.5
+        self.confidence_threshold = confidence_threshold
 
         # set cpu/gpu
         self.cpu_only = True
@@ -86,7 +87,7 @@ class DensePoseDetectPerson(Kernel):
         keyps = cls_keyps[PERSON_CATEGORY] # N x np.array(4 x 17) (x, y, logit, prob)
         bodys = cls_bodys[PERSON_CATEGORY] # N x np.array(m, n).dtype(uint8) value 0-24
         
-        valid_inds = boxes[:, 4] > self.min_score_thresh
+        valid_inds = boxes[:, 4] > self.confidence_threshold
         # compact version
         # keyps = [kp[:2].transpose(1, 0) for kp in keyps]
         # result = [[{'bbox': {'x1' : bbox[0], 'y1': bbox[1], 'x2' : bbox[2], 'y2' : bbox[3]},

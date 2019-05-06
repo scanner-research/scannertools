@@ -32,9 +32,11 @@ CONFIG_FILE = "/opt/maskrcnn-benchmark/configs/caffe2/e2e_mask_rcnn_X_101_32x8d_
 class MaskRCNNDetectObjects(Kernel):
     def __init__(self, 
         config,
+        confidence_threshold=0.5,
+        min_image_size=800
     ):
-        self.confidence_threshold = 0.5
-        self.min_image_size = 800
+        self.confidence_threshold = confidence_threshold
+        self.min_image_size = min_image_size
         # self.mask_shrink = 4
         
         # set cpu/gpu
