@@ -10,11 +10,13 @@ Requirements:
 * OpenCV >= 3.4.0
 * pybind11 >= 2.2.3
 * ffmeg >= 3.3.1
+* tensorflow >= 1.11.0
 
 #### Ubuntu 16.04
 
 ```
 sudo apt-get install -y ffmpeg pybind11-dev
+pip3 install tensorflow
 ```
 
 See the [OpenCV docs](https://docs.opencv.org/3.4.1/d2/de6/tutorial_py_setup_in_ubuntu.html) for installing OpenCV.
@@ -23,6 +25,7 @@ See the [OpenCV docs](https://docs.opencv.org/3.4.1/d2/de6/tutorial_py_setup_in_
 
 ```
 brew install ffmpeg opencv@3 pybind11
+pip3 install tensorflow
 ```
 
 ### Library
