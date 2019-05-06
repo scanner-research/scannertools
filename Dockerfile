@@ -37,7 +37,7 @@ RUN git clone -b python3 https://github.com/scanner-research/DensePose.git \
  && pip3 install -r requirements.txt \
  && make \
 #&&make ops \
- && cd DensePoseData && bash get_densepose_uv.sh \
+ && cd DensePoseData && bash get_densepose_uv.sh
 ENV PYTHONPATH /opt/DensePose:$PYTHONPATH
 
 RUN apt-get update && apt-get install -y jq
@@ -56,6 +56,6 @@ RUN if [ "$tag2" != "cpu" ]; then \
     fi
 
 COPY . scannertools
-RUN cd scannertools && pip3 install --upgrade setuptools #&& ./scripts/install-all.sh
+RUN cd scannertools && pip3 install --upgrade setuptools && ./scripts/install-all.sh
 
 WORKDIR /app
