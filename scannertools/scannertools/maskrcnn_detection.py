@@ -175,11 +175,10 @@ class MaskRCNNDetectObjects(Kernel):
 ##################################################################################################
 # Mostly taken from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/demo/predictor.py
 
-@scannerpy.register_python_op(name='TorchDrawBoxes')
-def draw_boxes(config, frame: FrameType, bundled_data: bytes) -> FrameType:
+@scannerpy.register_python_op(name='DrawMaskRCNN')
+def draw_maskrcnn(config, frame: FrameType, bundled_data: Any) -> FrameType:
     min_score_thresh = config.args['min_score_thresh']
-    metadata = pickle.loads(bundled_data)
-    visualize_labels(frame, metadata, min_score_thresh)
+    visualize_one_image(frame, bundled_data, min_score_thresh)
     return frame
 
 
@@ -267,7 +266,7 @@ CATEGORIES = [
         "toothbrush",]
 
 
-def visualize_labels(image, metadata, min_score_thresh=0.5, blending_alpha=0.5):
+def visualize_one_image(image, metadata, min_score_thresh=0.5, blending_alpha=0.5):
     if len(metadata) == 0:
         return 
     scores = [obj['score'] for obj in metadata]

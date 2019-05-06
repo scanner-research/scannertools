@@ -122,19 +122,18 @@ class DensePoseDetectPerson(Kernel):
 # Mostly taken from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/demo/predictor.py
 
 @scannerpy.register_python_op(name='DrawDensePose')
-def draw_densepose(config, frame: FrameType, bundled_data: bytes) -> FrameType:
-    min_score_thresh = config.args['min_score_thresh']
-    show_box = config.args['show_box']
-    show_keypoint = config.args['show_keypoint']
-    show_mask = config.args['show_mask']
-    show_body = config.args['show_body']
+def draw_densepose(config, frame: FrameType, bundled_data: Any) -> FrameType:
+    min_score_thresh = config.args.get('min_score_thresh', 0.5)
+    show_box = config.args.get('show_box', True)
+    show_keypoint = config.args.get('show_keypoint', True)
+    show_mask = config.args.get('show_mask', True)
+    show_body = config.args.get('show_body', False)
 
-    metadata = pickle.loads(bundled_data)
     if show_body:
-        visualize_uvbody(frame, metadata, min_score_thresh)
+        result = visualize_uvbody(frame, bundled_data, min_score_thresh)
     else:
-        visualize_one_image(frame, metadata, min_score_thresh, show_box, show_keypoint, show_mask)
-    return frame
+        result = visualize_one_image(frame, bundled_data, min_score_thresh, show_box, show_keypoint, show_mask)
+    return result
 
 
 def visualize_one_image(im, metadata, min_score_thresh=0.5, show_box=True, show_keypoint=True, show_mask=True, kp_thresh=2):
@@ -217,4 +216,6 @@ def visualize_uvbody(im, metadata, min_score_thresh):
     All_Coords = All_Coords.astype(np.uint8)
     # All_inds = All_inds.astype(np.uint8)
     #
-    return All_Coords
+    result = im.copy()
+    result[All_Coords!=0] = All_Coords[All_Coords!=0]
+    return result
