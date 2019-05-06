@@ -104,11 +104,11 @@ class DensePoseDetectPerson(Kernel):
     def execute(self, frame: Sequence[FrameType]) -> Sequence[Any]:
         assert len(frame) == 1, "Densepose only support batch_size=1"
         # change image to BGR
-        im = frame[0][..., ::-1]
+        image = frame[0][..., ::-1]
 
         with c2_utils.NamedCudaScope(self.gpu_id):
             cls_boxes, cls_segms, cls_keyps, cls_bodys = infer_engine.im_detect_all(
-                self.model, im, None, None
+                self.model, image, None, None
                 )
 
         result = self.convert_result_to_dict(cls_boxes, cls_segms, cls_keyps, cls_bodys)
@@ -123,26 +123,26 @@ class DensePoseDetectPerson(Kernel):
 
 @scannerpy.register_python_op(name='DrawDensePose')
 def draw_densepose(config, frame: FrameType, bundled_data: Any) -> FrameType:
-    min_score_thresh = config.args.get('min_score_thresh', 0.5)
+    min_score_thresh = config.args.get('min_score_thresh', 0.7)
     show_box = config.args.get('show_box', True)
     show_keypoint = config.args.get('show_keypoint', True)
     show_mask = config.args.get('show_mask', True)
     show_body = config.args.get('show_body', False)
 
     if show_body:
-        result = visualize_uvbody(frame, bundled_data, min_score_thresh)
+        result = visualize_uvbody(frame, bundled_data, min_score_thresh, overlay=True)
     else:
         result = visualize_one_image(frame, bundled_data, min_score_thresh, show_box, show_keypoint, show_mask)
     return result
 
 
-def visualize_one_image(im, metadata, min_score_thresh=0.5, show_box=True, show_keypoint=True, show_mask=True, kp_thresh=2):
+def visualize_one_image(image, metadata, min_score_thresh=0.5, show_box=True, show_keypoint=True, show_mask=True, kp_thresh=2):
     if len(metadata) == 0:
-        return im
+        return image
     if 'bbox' in metadata[0]:
         boxes = np.array([obj['bbox'] for obj in metadata])
     else:
-        return im
+        return image
     if 'mask' in metadata[0]:
         segms = [obj['mask'] for obj in metadata]
         masks = mask_util.decode(segms)
@@ -155,6 +155,7 @@ def visualize_one_image(im, metadata, min_score_thresh=0.5, show_box=True, show_
     else:
         keyps = None
 
+    result = image.copy()
     # Display in largest to smallest order to reduce occlusion
     areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
     sorted_inds = np.argsort(-areas)
@@ -167,29 +168,29 @@ def visualize_one_image(im, metadata, min_score_thresh=0.5, show_box=True, show_
 
         # show box (off by default)
         if show_box:
-            im = vis_bbox(
-                im, (bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]))
+            result = vis_bbox(
+                result, (bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]))
 
         # show keypoints
         if show_keypoint and keyps is not None and len(keyps) > i:
-            im = vis_keypoints(im, keyps[i], kp_thresh)
+            result = vis_keypoints(result, keyps[i], kp_thresh)
 
          # show mask
         if show_mask and segms is not None and len(segms) > i:
             color_mask = color_list[mask_color_id % len(color_list), 0:3]
             mask_color_id += 1
-            im = vis_mask(im, masks[..., i], color_mask)
+            result = vis_mask(result, masks[..., i], color_mask)
 
-    return im
+    return result
 
 
-def visualize_uvbody(im, metadata, min_score_thresh):
+def visualize_uvbody(image, metadata, min_score_thresh, overlay=False):
     if len(metadata) == 0 or not 'bbox' in metadata[0] or not 'body' in metadata[0]:
-        return im
+        return image if overlay else np.zeros_like(image)
     boxes = np.array([obj['bbox'] for obj in metadata])
     IUV_fields = [obj['body'] for obj in metadata]
     #
-    All_Coords = np.zeros(im.shape)
+    All_Coords = np.zeros(image.shape)
     # All_inds = np.zeros([im.shape[0],im.shape[1]])
     K = 26
     ##
@@ -216,6 +217,9 @@ def visualize_uvbody(im, metadata, min_score_thresh):
     All_Coords = All_Coords.astype(np.uint8)
     # All_inds = All_inds.astype(np.uint8)
     #
-    result = im.copy()
-    result[All_Coords!=0] = All_Coords[All_Coords!=0]
-    return result
+    if overlay:
+        result = image.copy()
+        result[All_Coords!=0] = All_Coords[All_Coords!=0]
+        return result
+    else:
+        return All_Coords

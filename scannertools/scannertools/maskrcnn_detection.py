@@ -58,7 +58,7 @@ class MaskRCNNDetectObjects(Kernel):
             cfg.merge_from_list(["MODEL.DEVICE", "cpu"])
         else:
             cfg.merge_from_list(["MODEL.DEVICE", "cuda"])
-        cfg.merge_from_list(["INPUT.TO_BGR255", False])
+        cfg.merge_from_list(["INPUT.TO_BGR255", True])
         self.cfg = cfg.clone()
 
         # build model and transform
@@ -96,9 +96,9 @@ class MaskRCNNDetectObjects(Kernel):
         # by 255 if we want to convert to BGR255 format, or flip the channels
         # if we want it to be in RGB in [0-1] range.
         if cfg.INPUT.TO_BGR255:
-            to_bgr_transform = T.Lambda(lambda x: x * 255)
-        else:
             to_bgr_transform = T.Lambda(lambda x: x[[2, 1, 0]] * 255)
+        else:
+            to_bgr_transform = T.Lambda(lambda x: x * 255)
 
         normalize_transform = T.Normalize(
             mean=cfg.INPUT.PIXEL_MEAN, std=cfg.INPUT.PIXEL_STD
@@ -177,9 +177,9 @@ class MaskRCNNDetectObjects(Kernel):
 
 @scannerpy.register_python_op(name='DrawMaskRCNN')
 def draw_maskrcnn(config, frame: FrameType, bundled_data: Any) -> FrameType:
-    min_score_thresh = config.args['min_score_thresh']
-    visualize_one_image(frame, bundled_data, min_score_thresh)
-    return frame
+    min_score_thresh = config.args.get('min_score_thresh', 0.7)
+    result = visualize_one_image(frame, bundled_data, min_score_thresh)
+    return result
 
 
 CATEGORIES = [
@@ -266,16 +266,17 @@ CATEGORIES = [
         "toothbrush",]
 
 
-def visualize_one_image(image, metadata, min_score_thresh=0.5, blending_alpha=0.5):
+def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.5):
     if len(metadata) == 0:
-        return 
+        return image
     scores = [obj['score'] for obj in metadata]
     boxes = [obj['bbox'] for obj in metadata] if 'bbox' in metadata[0] else [None] * len(metadata)
     masks = [obj['mask'] for obj in metadata] if 'mask' in metadata[0] else [None] * len(metadata)
     labels = [obj['label'] for obj in metadata]
     colors = compute_colors_for_labels(labels).tolist()
     labels = [CATEGORIES[int(i)] for i in labels]
-    
+
+    result = image.copy()
     for score, box, mask, label, color in zip(scores, boxes, masks, labels, colors):
         if score < min_score_thresh:
             continue
@@ -288,7 +289,7 @@ def visualize_one_image(image, metadata, min_score_thresh=0.5, blending_alpha=0.
             else:
                 top_left = (int(box[0]), int(box[1])) 
                 bottom_right = (int(box[2]), int(box[3]))
-            image = cv2.rectangle(image, top_left, bottom_right, tuple(color), 3)
+            result = cv2.rectangle(result, top_left, bottom_right, tuple(color), 3)
 
         
         if not mask is None:
@@ -297,15 +298,15 @@ def visualize_one_image(image, metadata, min_score_thresh=0.5, blending_alpha=0.
             mask = mask_util.decode([mask])[..., 0]
             # overlay mask
             for c in range(3):
-                image[:, :, c] = np.where(mask > 0,
-                                          image[:, :, c] * (1 - blending_alpha) + color[c] * blending_alpha,
-                                          image[:, :, c])
+                result[:, :, c] = np.where(mask > 0,
+                                          result[:, :, c] * (1 - blending_alpha) + color[c] * blending_alpha,
+                                          result[:, :, c])
             # draw mask contour
             # thresh = (mask_large[..., None] > 0).astype(np.uint8) 
             # contours, hierarchy = cv2_util.findContours(
             #     thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             # )
-            # image = cv2.drawContours(image, contours, -1, color, 3)
+            # result = cv2.drawContours(result, contours, -1, color, 3)
 
         # draw class name
         if not box is None:
@@ -315,14 +316,16 @@ def visualize_one_image(image, metadata, min_score_thresh=0.5, blending_alpha=0.
             else:
                 x, y = int(box[0]), int(box[1])
             s = template.format(label, score)
-            cv2.putText(image, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
+            result = cv2.putText(result, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
+
+        return result
 
 
 def compute_colors_for_labels(labels):
     """
     Simple function that adds fixed colors depending on the class
     """
-    palette = np.array([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    palette = np.array([2 ** 21 - 1, 2 ** 15 - 1, 2 ** 25 - 1])
     colors = np.array(labels)[:, None] * palette
     colors = (colors % 255).astype("uint8")
     return colors
