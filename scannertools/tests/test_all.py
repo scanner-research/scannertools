@@ -240,8 +240,9 @@ def test_maskrcnn_detection(sc):
     assert len(output[0]) == 1
 
 
+@needs_gpu()
 def test_densepose_detection(sc):
     def make(frame):
-        return sc.ops.DensePoseDetectPerson(frame=frame, device=DeviceType.GPU)
+        return sc.ops.DensePoseDetectPerson(frame=frame)
     output = run_op(sc, make)
     assert len(output[0]) == 1
