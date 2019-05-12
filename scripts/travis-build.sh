@@ -5,9 +5,9 @@ yes | docker login -u="$DOCKER_USER" -p="$DOCKER_PASS"
 
 if [ "${TAG}" = "cpu" ];
 then
-    FORCE_CUDA = 0;
+    FORCE_CUDA=0;
 else
-    FORCE_CUDA = 1;
+    FORCE_CUDA=1;
 fi
 
 docker build \
