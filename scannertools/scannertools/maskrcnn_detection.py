@@ -118,6 +118,7 @@ class MaskRCNNDetectObjects(Kernel):
     # Evaluate object detection DNN model on a frame
     # Return bounding box position, class and score
     def execute(self, frame: Sequence[FrameType]) -> Sequence[Any]:
+        H, W = frame[0].shape[:2]
         # apply pre-processing to image
         frame_trans = [self.transforms(img) for img in frame]
         # convert to an ImageList, padded so that it is divisible by
@@ -155,7 +156,7 @@ class MaskRCNNDetectObjects(Kernel):
         def encode_mask(mask):
             return mask_util.encode(np.asfortranarray(mask.transpose(1, 2, 0)))[0]
 
-        result = [[{'bbox': {'x1' : float(bbox[0]), 'y1': float(bbox[1]), 'x2' : float(bbox[2]), 'y2' : float(bbox[3])},
+        result = [[{'bbox': {'x1' : float(bbox[0])/W, 'y1': float(bbox[1])/H, 'x2' : float(bbox[2])/W, 'y2' : float(bbox[3])}/H,
                 'mask' : encode_mask(mask.numpy()), 
                 'label' : float(label), 'score' : float(score)}
                 for (bbox, mask, label, score) in zip(pred.bbox, pred.get_field("mask"), pred.get_field("labels"), pred.get_field("scores")) ]
@@ -262,6 +263,7 @@ CATEGORIES = [
 def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.5):
     if len(metadata) == 0:
         return image
+    H, W = image.shape[:2]
     scores = [obj['score'] for obj in metadata]
     boxes = [obj['bbox'] for obj in metadata] if 'bbox' in metadata[0] else [None] * len(metadata)
     masks = [obj['mask'] for obj in metadata] if 'mask' in metadata[0] else [None] * len(metadata)
@@ -277,16 +279,14 @@ def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.
         # draw bbox 
         if not box is None:  
             if 'x1' in box:
-                top_left = (int(box['x1']), int(box['y1'])) 
-                bottom_right = (int(box['x2']), int(box['y2']))
+                top_left = (int(box['x1']*W), int(box['y1']*H)) 
+                bottom_right = (int(box['x2']*W), int(box['y2']*H))
             else:
-                top_left = (int(box[0]), int(box[1])) 
-                bottom_right = (int(box[2]), int(box[3]))
+                top_left = (int(box[0]*W), int(box[1]*H)) 
+                bottom_right = (int(box[2]*W), int(box[3]*H))
             result = cv2.rectangle(result, top_left, bottom_right, tuple(color), 3)
 
         if not mask is None:
-            # H, W =  mask.shape  
-            # mask_large = cv2.resize(mask, (W * mask_shrink, H * mask_shrink))
             mask = mask_util.decode([mask])[..., 0]
             # overlay mask
             for c in range(3):
@@ -298,9 +298,9 @@ def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.
         if not box is None:
             template = "{}: {:.2f}"
             if 'x1' in box:
-                x, y = int(box['x1']), int(box['y1'])
+                x, y = int(box['x1']*W), int(box['y1']*H)
             else:
-                x, y = int(box[0]), int(box[1])
+                x, y = int(box[0]*W), int(box[1]*H)
             s = template.format(label, score)
             result = cv2.putText(result, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
 
