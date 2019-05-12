@@ -5,20 +5,17 @@ yes | docker login -u="$DOCKER_USER" -p="$DOCKER_PASS"
 
 if [ "${TAG}" = "cpu" ];
 then
-    docker build \
-           -t ${DOCKER_REPO}:${TAG}-latest \
-           --build-arg tag=${TAG} \
-           --build-arg tag2=${TAG} \
-           --build-arg force_cuda=0 \
-           .
+    FORCE_CUDA = 0
 else
-    docker build \
-           -t ${DOCKER_REPO}:${TAG}-latest \
-           --build-arg tag=${TAG} \
-           --build-arg tag2=${TAG} \
-           --build-arg force_cuda=1 \
-           .
-fi    
+    FORCE_CUDA = 1
+fi
+
+docker build \
+       -t ${DOCKER_REPO}:${TAG}-latest \
+       --build-arg tag=${TAG} \
+       --build-arg tag2=${TAG} \
+       --build-arg force_cuda=${FORCE_CUDA} \
+       .
 
 if [ "${TAG}" = "cpu" ];
 then

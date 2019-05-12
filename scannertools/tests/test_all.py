@@ -231,3 +231,17 @@ def test_shot_detection(sc):
         output_op, PerfParams.manual(work_packet_size=1000, io_packet_size=1000, pipeline_instances_per_node=1),
         cache_mode=CacheMode.Overwrite, show_progress=False)
     assert len(next(output.load(rows=[0]))) == 7
+
+
+def test_maskrcnn_detection(sc):
+    def make(frame):
+        return sc.ops.MaskRCNNDetectObjects(frame=frame)
+    output = run_op(sc, make)
+    assert len(output[0]) == 1
+
+
+def test_densepose_detection(sc):
+    def make(frame):
+        return sc.ops.DensePoseDetectPerson(frame=frame, device=DeviceType.GPU)
+    output = run_op(sc, make)
+    assert len(output[0]) == 1

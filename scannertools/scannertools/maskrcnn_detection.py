@@ -28,7 +28,7 @@ import pycocotools.mask as mask_util
 
 CONFIG_FILE = "/opt/maskrcnn-benchmark/configs/caffe2/e2e_mask_rcnn_X_101_32x8d_FPN_1x_caffe2.yaml"
 
-@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=5)
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=4)
 class MaskRCNNDetectObjects(Kernel):
     def __init__(self, 
         config,
@@ -37,7 +37,6 @@ class MaskRCNNDetectObjects(Kernel):
     ):
         self.confidence_threshold = confidence_threshold
         self.min_image_size = min_image_size
-        # self.mask_shrink = 4
         
         # set cpu/gpu
         self.cpu_only = True
@@ -152,12 +151,6 @@ class MaskRCNNDetectObjects(Kernel):
             scores = pred.get_field("scores")
             _, idx = scores.sort(0, descending=True)
             top_predictions += [pred[idx]]
-
-        # def resize_mask(mask):
-        #     H, W = mask.shape
-        #     mask_small = cv2.resize(mask, (W // self.mask_shrink, H // self.mask_shrink))
-        #     mask_small = (mask_small > 0).astype(np.uint8) * 255
-        #     return mask_small
 
         def encode_mask(mask):
             return mask_util.encode(np.asfortranarray(mask.transpose(1, 2, 0)))[0]
@@ -291,7 +284,6 @@ def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.
                 bottom_right = (int(box[2]), int(box[3]))
             result = cv2.rectangle(result, top_left, bottom_right, tuple(color), 3)
 
-        
         if not mask is None:
             # H, W =  mask.shape  
             # mask_large = cv2.resize(mask, (W * mask_shrink, H * mask_shrink))
@@ -301,13 +293,7 @@ def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.
                 result[:, :, c] = np.where(mask > 0,
                                           result[:, :, c] * (1 - blending_alpha) + color[c] * blending_alpha,
                                           result[:, :, c])
-            # draw mask contour
-            # thresh = (mask_large[..., None] > 0).astype(np.uint8) 
-            # contours, hierarchy = cv2_util.findContours(
-            #     thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-            # )
-            # result = cv2.drawContours(result, contours, -1, color, 3)
-
+        
         # draw class name
         if not box is None:
             template = "{}: {:.2f}"

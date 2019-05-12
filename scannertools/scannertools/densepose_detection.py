@@ -53,8 +53,6 @@ class DensePoseDetectPerson(Kernel):
                 self.cpu_only = False
         if not self.cpu_only:
             print('Using GPU: {}'.format(visible_device_list[0]))
-            # torch.cuda.set_device(visible_device_list[0])
-            # os.environ["CUDA_VISIBLE_DEVICES"]="{}".format(visible_device_list[0])
             self.gpu_id = visible_device_list[0]
         else:
             print('Using CPU')
@@ -88,12 +86,6 @@ class DensePoseDetectPerson(Kernel):
         bodys = cls_bodys[PERSON_CATEGORY] # N x np.array(m, n).dtype(uint8) value 0-24
         
         valid_inds = boxes[:, 4] > self.confidence_threshold
-        # compact version
-        # keyps = [kp[:2].transpose(1, 0) for kp in keyps]
-        # result = [[{'bbox': {'x1' : bbox[0], 'y1': bbox[1], 'x2' : bbox[2], 'y2' : bbox[3]},
-        #             'mask' : mask, 'keyp': keyp, 'body': body.transpose(1, 2, 0), 'score' : bbox[4]}
-        #             for (bbox, mask, keyp, body) in zip(boxes, segms, keyps, bodys) ]]
-        # original version
         result = [{'bbox': bbox, 'mask' : mask, 'keyp': keyp, 'body': body, 'score' : bbox[4]}
                     for i, (bbox, mask, keyp, body) in enumerate(zip(boxes, segms, keyps, bodys)) 
                     if valid_inds[i] ]
@@ -189,37 +181,22 @@ def visualize_uvbody(image, metadata, min_score_thresh, overlay=False):
         return image if overlay else np.zeros_like(image)
     boxes = np.array([obj['bbox'] for obj in metadata])
     IUV_fields = [obj['body'] for obj in metadata]
-    #
     All_Coords = np.zeros(image.shape)
-    # All_inds = np.zeros([im.shape[0],im.shape[1]])
-    K = 26
-    ##
-    inds = np.argsort(boxes[:,4])
-    ##
+    inds = np.argsort(boxes[:, 4])
     for i, ind in enumerate(inds):
-        entry = boxes[ind,:]
+        entry = boxes[ind, :]
         if entry[4] > min_score_thresh:
-            entry=entry[0:4].astype(int)
-            ####
+            entry = entry[0:4].astype(int)
             output = IUV_fields[ind]
-            ####
-            All_Coords_Old = All_Coords[ entry[1] : entry[1]+output.shape[1],entry[0]:entry[0]+output.shape[2],:]
-            All_Coords_Old[All_Coords_Old==0]=output.transpose([1,2,0])[All_Coords_Old==0]
-            All_Coords[ entry[1] : entry[1]+output.shape[1],entry[0]:entry[0]+output.shape[2],:]= All_Coords_Old
-            ###
-            # CurrentMask = (output[0,:,:]>0).astype(np.float32)
-            # All_inds_old = All_inds[ entry[1] : entry[1]+output.shape[1],entry[0]:entry[0]+output.shape[2]]
-            # All_inds_old[All_inds_old==0] = CurrentMask[All_inds_old==0]*i
-            # All_inds[ entry[1] : entry[1]+output.shape[1],entry[0]:entry[0]+output.shape[2]] = All_inds_old
-    #
-    All_Coords[:,:,1:3] = 255. * All_Coords[:,:,1:3]
-    All_Coords[All_Coords>255] = 255.
+            All_Coords_Old = All_Coords[entry[1] : entry[1] + output.shape[1], entry[0] : entry[0] + output.shape[2], :]
+            All_Coords_Old[All_Coords_Old == 0] = output.transpose([1,2,0])[All_Coords_Old == 0]
+            All_Coords[entry[1] : entry[1] + output.shape[1], entry[0] : entry[0] + output.shape[2], :] = All_Coords_Old
+    All_Coords[:, :, 1:3] = 255. * All_Coords[:, :, 1:3]
+    All_Coords[All_Coords > 255] = 255.
     All_Coords = All_Coords.astype(np.uint8)
-    # All_inds = All_inds.astype(np.uint8)
-    #
     if overlay:
         result = image.copy()
-        result[All_Coords!=0] = All_Coords[All_Coords!=0]
+        result[All_Coords != 0] = All_Coords[All_Coords != 0]
         return result
     else:
         return All_Coords
