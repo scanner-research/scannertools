@@ -38,7 +38,6 @@ RUN git clone -b python3 https://github.com/scanner-research/DensePose.git \
  && cd DensePose \
  && pip3 install -r requirements.txt \
  && make \
-#&&make ops \
  && cd DensePoseData && bash get_densepose_uv.sh
 ENV PYTHONPATH /opt/DensePose:$PYTHONPATH
 
