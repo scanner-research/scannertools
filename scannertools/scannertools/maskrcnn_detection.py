@@ -156,7 +156,7 @@ class MaskRCNNDetectObjects(Kernel):
         def encode_mask(mask):
             return mask_util.encode(np.asfortranarray(mask.transpose(1, 2, 0)))[0]
 
-        result = [[{'bbox': {'x1' : float(bbox[0])/W, 'y1': float(bbox[1])/H, 'x2' : float(bbox[2])/W, 'y2' : float(bbox[3])}/H,
+        result = [[{'bbox': {'x1' : float(bbox[0])/W, 'y1': float(bbox[1])/H, 'x2' : float(bbox[2])/W, 'y2' : float(bbox[3])/H},
                 'mask' : encode_mask(mask.numpy()), 
                 'label' : float(label), 'score' : float(score)}
                 for (bbox, mask, label, score) in zip(pred.bbox, pred.get_field("mask"), pred.get_field("labels"), pred.get_field("scores")) ]
