@@ -1,18 +1,13 @@
-import os
-import tarfile
 import numpy as np
-import sys
 import torch
 import cv2
 from torchvision import transforms as T
 
 # scanner
-from scannerpy.util import download_temp_file, temp_directory
 import scannerpy
-from scannerpy import FrameType, DeviceType, protobufs
-from scannerpy.types import BboxList
+from scannerpy import FrameType, DeviceType
 from scannerpy.kernel import Kernel
-from typing import Sequence, Tuple, Any
+from typing import Sequence, Any
 
 # maskrcnn libs
 from maskrcnn_benchmark.config import cfg

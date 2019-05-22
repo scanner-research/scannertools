@@ -1,9 +1,5 @@
-import os
 import numpy as np
-import torch
 import cv2
-import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
 
 # scanner
 import scannerpy
@@ -20,18 +16,15 @@ from detectron.utils.io import cache_url
 import detectron.core.test_engine as infer_engine
 import detectron.utils.c2 as c2_utils
 import detectron.utils.vis as vis_utils
-
 from detectron.utils.colormap import colormap
 from detectron.utils.vis import vis_mask, vis_bbox, vis_keypoints
 
 import pycocotools.mask as mask_util
 
-
 c2_utils.import_detectron_ops()
+cv2.ocl.setUseOpenCL(False)
 # OpenCL may be enabled by default in OpenCV3; disable it because it's not
 # thread safe and causes unwanted GPU memory allocations.
-cv2.ocl.setUseOpenCL(False)
-
 
 CONFIG_FILE = "/opt/DensePose/configs/DensePoseKeyPointsMask_ResNet50_FPN_s1x-e2e.yaml"
 MODEL_FILE = "https://dl.fbaipublicfiles.com/densepose/DensePoseKeyPointsMask_ResNet50_FPN_s1x-e2e.pkl"
@@ -42,6 +35,7 @@ class DensePoseDetectPerson(Kernel):
         config,
         confidence_threshold=0.5
     ):
+
         self.confidence_threshold = confidence_threshold
 
         # set cpu/gpu
@@ -61,17 +55,17 @@ class DensePoseDetectPerson(Kernel):
         # set densepose config
         self.cfg = cfg
         merge_cfg_from_file(CONFIG_FILE)
-        self.cfg.NUM_GPUS = 2
+        self.cfg.NUM_GPUS = 1
 
 
     def fetch_resources(self):
         # load model weights (download model weights and cache it)
         cache_url(MODEL_FILE, self.cfg.DOWNLOAD_CACHE)
-        assert_and_infer_cfg(cache_urls=False)
 
 
     def setup_with_resources(self):
         # load model weights from cache
+        assert_and_infer_cfg(cache_urls=False)
         model_weights = cache_url(MODEL_FILE, self.cfg.DOWNLOAD_CACHE)
         self.model = infer_engine.initialize_model_from_cfg(model_weights, gpu_id=self.gpu_id)
     
@@ -111,7 +105,6 @@ class DensePoseDetectPerson(Kernel):
 ##################################################################################################
 # Visualization Functions                                                                               #
 ##################################################################################################
-# Mostly taken from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/demo/predictor.py
 
 @scannerpy.register_python_op(name='DrawDensePose')
 def draw_densepose(config, frame: FrameType, bundled_data: Any) -> FrameType:
