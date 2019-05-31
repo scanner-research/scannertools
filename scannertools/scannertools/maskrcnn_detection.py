@@ -270,7 +270,6 @@ def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.
     for score, box, mask, label, color in zip(scores, boxes, masks, labels, colors):
         if score < min_score_thresh:
             continue
-
         # draw bbox 
         if not box is None:  
             if 'x1' in box:
@@ -299,7 +298,7 @@ def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.
             s = template.format(label, score)
             result = cv2.putText(result, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
 
-        return result
+    return result
 
 
 def compute_colors_for_labels(labels):
