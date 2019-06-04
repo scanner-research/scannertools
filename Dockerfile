@@ -19,6 +19,11 @@ ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 RUN pip3 install torchvision_nightly
 RUN pip3 install torch_nightly -f https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html
 
+# Install maskrcnn dependencies
+RUN git clone git clone https://www.github.com/nvidia/apex && \
+    cd apex && pip3 install . && cd .. && rm -rf apex
+RUN pip3 install yacs
+
 # Install maskrcnn-benchmark
 ARG force_cuda
 ENV FORCE_CUDA=${force_cuda}

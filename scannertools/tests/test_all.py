@@ -7,6 +7,7 @@ import scannertools.imgproc
 import scannertools.misc
 import scannertools.storage
 import scannertools.face_detection
+import scannertools.maskrcnn_detection
 import tempfile
 import json
 from scannerpy import CacheMode, DeviceType, protobufs, NamedStream, NamedVideoStream, PerfParams
@@ -42,8 +43,10 @@ def run_op(sc, op):
     faces = op(frame=gather_frame)
     output = NamedStream(sc, 'output')
     output_op = sc.io.Output(faces, [output])
-    sc.run(output_op, PerfParams.estimate(pipeline_instances_per_node=1),
-           cache_mode=CacheMode.Overwrite, show_progress=False)
+    sc.run(output_op,
+           PerfParams.estimate(pipeline_instances_per_node=1),
+           cache_mode=CacheMode.Overwrite,
+           show_progress=False)
     return list(output.load())
 
 
@@ -58,7 +61,9 @@ def test_captions(sc):
     captions = sc.io.Input([CaptionStream(caption_path, window_size=10.0, max_time=3600)])
     ignored = sc.ops.DecodeCap(cap=captions)
     output = sc.io.Output(ignored, [NamedStream(sc, 'caption_test')])
-    sc.run(output, PerfParams.estimate(pipeline_instances_per_node=1), cache_mode=CacheMode.Overwrite)
+    sc.run(output,
+           PerfParams.estimate(pipeline_instances_per_node=1),
+           cache_mode=CacheMode.Overwrite)
 
 
 def test_files_source(sc):
@@ -118,7 +123,6 @@ def test_files_sink(sc):
         assert d == i
 
 
-
 def test_python_source(sc):
     # Write test files
     py_data = [{'{:d}'.format(i): i} for i in range(4)]
@@ -135,7 +139,6 @@ def test_python_source(sc):
         assert d['{:d}'.format(i)] == i
         num_rows += 1
     assert num_rows == 4
-
 
 
 class DeviceTestBench:
@@ -155,7 +158,10 @@ class TestHistogram(DeviceTestBench):
         output = NamedStream(sc, 'test_hist')
         output_op = sc.io.Output(hist, [output])
 
-        sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
+        sc.run(output_op,
+               PerfParams.estimate(),
+               cache_mode=CacheMode.Overwrite,
+               show_progress=False)
         next(output.load())
 
 
@@ -167,7 +173,10 @@ class TestOpticalFlow(DeviceTestBench):
         flow_range = sc.streams.Range(flow, ranges=[{'start': 0, 'end': 50}])
         output = NamedStream(sc, 'test_flow')
         output_op = sc.io.Output(flow_range, [output])
-        sc.run(output_op, PerfParams.estimate(), cache_mode=CacheMode.Overwrite, show_progress=False)
+        sc.run(output_op,
+               PerfParams.estimate(),
+               cache_mode=CacheMode.Overwrite,
+               show_progress=False)
         assert output.len() == 50
 
         flow_array = next(output.load())
@@ -203,6 +212,7 @@ def test_face_embedding(sc):
     def make(frame):
         bboxes = sc.ops.MTCNNDetectFaces(frame=frame)
         return sc.ops.EmbedFaces(frame=frame, bboxes=bboxes)
+
     output = run_op(sc, make)
     assert len(output[0]) == 1
 
@@ -211,6 +221,7 @@ def test_gender(sc):
     def make(frame):
         bboxes = sc.ops.MTCNNDetectFaces(frame=frame)
         return sc.ops.DetectGender(frame=frame, bboxes=bboxes)
+
     output = run_op(sc, make)
     assert len(output[0]) == 1
 
@@ -227,15 +238,19 @@ def test_shot_detection(sc):
     boundaries = sc.ops.ShotBoundaries(histograms=hist)
     output = NamedStream(sc, 'output')
     output_op = sc.io.Output(boundaries, [output])
-    sc.run(
-        output_op, PerfParams.manual(work_packet_size=1000, io_packet_size=1000, pipeline_instances_per_node=1),
-        cache_mode=CacheMode.Overwrite, show_progress=False)
+    sc.run(output_op,
+           PerfParams.manual(work_packet_size=1000,
+                             io_packet_size=1000,
+                             pipeline_instances_per_node=1),
+           cache_mode=CacheMode.Overwrite,
+           show_progress=False)
     assert len(next(output.load(rows=[0]))) == 7
 
 
 def test_maskrcnn_detection(sc):
     def make(frame):
         return sc.ops.MaskRCNNDetectObjects(frame=frame)
+
     output = run_op(sc, make)
     assert len(output[0]) == 1
 
@@ -244,5 +259,6 @@ def test_maskrcnn_detection(sc):
 def test_densepose_detection(sc):
     def make(frame):
         return sc.ops.DensePoseDetectPerson(frame=frame)
+
     output = run_op(sc, make)
     assert len(output[0]) == 1
