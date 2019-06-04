@@ -20,7 +20,7 @@ RUN pip3 install torchvision_nightly
 RUN pip3 install torch_nightly -f https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html
 
 # Install maskrcnn dependencies
-RUN git clone git clone https://www.github.com/nvidia/apex && \
+RUN git clone https://www.github.com/nvidia/apex && \
     cd apex && pip3 install . && cd .. && rm -rf apex
 RUN pip3 install yacs
 

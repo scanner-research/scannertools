@@ -252,7 +252,7 @@ def test_maskrcnn_detection(sc):
         return sc.ops.MaskRCNNDetectObjects(frame=frame)
 
     output = run_op(sc, make)
-    assert len(output[0]) == 1
+    assert len(output[0]) == 10
 
 
 @needs_gpu()
