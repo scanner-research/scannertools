@@ -15,8 +15,7 @@ RUN git clone https://github.com/scanner-research/facenet && \
 ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 
 # pytorch (specific version for maskRCNN)
-RUN pip3 install torchvision_nightly
-RUN pip3 install torch_nightly -f https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html
+RUN pip3 install torchvision==0.3.0 torch==1.1.0
 
 # Install PyTorch Detection
 RUN if [ "$tag2" = "cpu" ]; then FORCE_CUDA="0"; else FORCE_CUDA="1"; fi
