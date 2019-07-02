@@ -33,9 +33,9 @@ MODEL_FILE = "https://dl.fbaipublicfiles.com/densepose/DensePoseKeyPointsMask_Re
 class DensePoseDetectPerson(Kernel):
     def __init__(self, 
         config,
-        confidence_threshold=0.5
+        confidence_threshold=0.5,
+        nms_threshold = 0.5
     ):
-
         self.confidence_threshold = confidence_threshold
 
         # set cpu/gpu
@@ -53,9 +53,10 @@ class DensePoseDetectPerson(Kernel):
         assert self.cpu_only == False, "Densepose does not support CPU"
 
         # set densepose config
-        self.cfg = cfg
         merge_cfg_from_file(CONFIG_FILE)
-        self.cfg.NUM_GPUS = 1
+        cfg.NUM_GPUS = 1
+        cfg.TEST.NMS = nms_threshold
+        self.cfg = cfg
 
 
     def fetch_resources(self):
@@ -80,10 +81,11 @@ class DensePoseDetectPerson(Kernel):
         bodys = cls_bodys[PERSON_CATEGORY] # N x np.array(m, n).dtype(uint8) value 0-24
         
         valid_inds = boxes[:, 4] > self.confidence_threshold
-        result = [{'bbox': bbox, 'mask' : mask, 'keyp': keyp, 'body': body, 'score' : bbox[4]}
+        result = [{'bbox': bbox, 'mask' : mask, 'keyp': keyp, 'score' : bbox[4], }# 'body': body}
                     for i, (bbox, mask, keyp, body) in enumerate(zip(boxes, segms, keyps, bodys)) 
                     if valid_inds[i] ]
         return result
+
     
     # Evaluate densepose model on a frame
     # For each person, return bounding box, keypoints, segmentation mask, densepose and score
