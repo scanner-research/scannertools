@@ -1,18 +1,13 @@
-import os
-import tarfile
 import numpy as np
-import sys
 import torch
 import cv2
 from torchvision import transforms as T
 
 # scanner
-from scannerpy.util import download_temp_file, temp_directory
 import scannerpy
-from scannerpy import FrameType, DeviceType, protobufs
-from scannerpy.types import BboxList
+from scannerpy import FrameType, DeviceType
 from scannerpy.kernel import Kernel
-from typing import Sequence, Tuple, Any
+from typing import Sequence, Any
 
 # maskrcnn libs
 from maskrcnn_benchmark.config import cfg
@@ -23,17 +18,20 @@ from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark import layers as L
 from maskrcnn_benchmark.utils import cv2_util
 
+import pycocotools.mask as mask_util
+
 
 CONFIG_FILE = "/opt/maskrcnn-benchmark/configs/caffe2/e2e_mask_rcnn_X_101_32x8d_FPN_1x_caffe2.yaml"
 
-@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=5)
+@scannerpy.register_python_op(device_sets=[[DeviceType.CPU, 0], [DeviceType.GPU, 1]], batch=4)
 class MaskRCNNDetectObjects(Kernel):
     def __init__(self, 
         config,
+        confidence_threshold=0.5,
+        min_image_size=800
     ):
-        self.confidence_threshold = 0.5
-        self.min_image_size = 800
-        self.mask_shrink = 4
+        self.confidence_threshold = confidence_threshold
+        self.min_image_size = min_image_size
         
         # set cpu/gpu
         self.cpu_only = True
@@ -54,7 +52,7 @@ class MaskRCNNDetectObjects(Kernel):
             cfg.merge_from_list(["MODEL.DEVICE", "cpu"])
         else:
             cfg.merge_from_list(["MODEL.DEVICE", "cuda"])
-        cfg.merge_from_list(["INPUT.TO_BGR255", False])
+        cfg.merge_from_list(["INPUT.TO_BGR255", True])
         self.cfg = cfg.clone()
 
         # build model and transform
@@ -92,9 +90,9 @@ class MaskRCNNDetectObjects(Kernel):
         # by 255 if we want to convert to BGR255 format, or flip the channels
         # if we want it to be in RGB in [0-1] range.
         if cfg.INPUT.TO_BGR255:
-            to_bgr_transform = T.Lambda(lambda x: x * 255)
-        else:
             to_bgr_transform = T.Lambda(lambda x: x[[2, 1, 0]] * 255)
+        else:
+            to_bgr_transform = T.Lambda(lambda x: x * 255)
 
         normalize_transform = T.Normalize(
             mean=cfg.INPUT.PIXEL_MEAN, std=cfg.INPUT.PIXEL_STD
@@ -115,6 +113,7 @@ class MaskRCNNDetectObjects(Kernel):
     # Evaluate object detection DNN model on a frame
     # Return bounding box position, class and score
     def execute(self, frame: Sequence[FrameType]) -> Sequence[Any]:
+        H, W = frame[0].shape[:2]
         # apply pre-processing to image
         frame_trans = [self.transforms(img) for img in frame]
         # convert to an ImageList, padded so that it is divisible by
@@ -149,173 +148,15 @@ class MaskRCNNDetectObjects(Kernel):
             _, idx = scores.sort(0, descending=True)
             top_predictions += [pred[idx]]
 
-        def resize_mask(mask):
-            H, W = mask.shape
-            mask_small = cv2.resize(mask, (W // self.mask_shrink, H // self.mask_shrink))
-            mask_small = (mask_small > 0).astype(np.uint8) * 255
-            return mask_small
+        def encode_mask(mask):
+            return mask_util.encode(np.asfortranarray(mask.transpose(1, 2, 0)))[0]
 
-        result = [[{'bbox': {'x1' : bbox.numpy()[0], 'y1': bbox.numpy()[1], 'x2' : bbox.numpy()[2], 'y2' : bbox.numpy()[3]},
-                'mask' : resize_mask(mask.numpy()[0]), 
-                'label' : label.numpy(), 'score' : score.numpy()}
+        result = [[{'bbox': {'x1' : float(bbox[0])/W, 'y1': float(bbox[1])/H, 'x2' : float(bbox[2])/W, 'y2' : float(bbox[3])/H},
+                'mask' : encode_mask(mask.numpy()), 
+                'label' : float(label), 'score' : float(score)}
                 for (bbox, mask, label, score) in zip(pred.bbox, pred.get_field("mask"), pred.get_field("labels"), pred.get_field("scores")) ]
                 for pred in top_predictions]
-        # import cloudpickle
-        # print(len(cloudpickle.dumps(result)))
-        # print(len(result))
-        # print([len(res) for res in result])
         return result
-
-
-##################################################################################################
-# Driver Functions                                                                               #
-##################################################################################################
-
-# # Intersection Over Union (Area)
-# def IoU(box1, box2):
-#     # intersection rectangle (y1, x1, y2, x2)
-#     y1 = max(box1[0], box2[0])
-#     x1 = max(box1[1], box2[1])
-#     y2 = min(box1[2], box2[2])
-#     x2 = min(box1[3], box2[3])
-#     area_intersection = (x2 - x1) * (y2 - y1)
-
-#     area_box1 = (box1[3] - box1[1]) * (box1[2] - box1[0])
-#     area_box2 = (box2[3] - box2[1]) * (box2[2] - box2[0])
-
-#     area_union = area_box1 + area_box2 - area_intersection
-
-#     return area_intersection * 1.0 / area_union
-
-
-# # non-maximum suppression
-# def nms_single(bundled_data, iou_threshold=0.5):
-#     bundled_data = bundled_data.reshape(20, 6)
-#     data_size = len(bundled_data)
-#     repeated_indices = []
-#     selected_indices = set(range(data_size))
-
-#     [boxes, classes, scores] = np.split(bundled_data, [4, 5], axis=1)
-
-#     for i in range(data_size):
-#         for j in range(i + 1, data_size):
-#             if IoU(boxes[i],
-#                    boxes[j]) > iou_threshold and classes[i] == classes[j]:
-#                 repeated_indices.append(j)
-
-#     repeated_indices = set(repeated_indices)
-#     selected_indices = list(selected_indices - repeated_indices)
-
-#     selected_bundled_data = np.take(bundled_data, selected_indices, axis=0)
-#     [boxes_np, classes_np, scores_np] = np.split(
-#         selected_bundled_data, [4, 5], axis=1)
-
-#     return [boxes_np, classes_np, scores_np]
-
-
-# # tried to use multiprocessing module to scale,
-# # but doesn't work well because of high overhead cost
-# def nms_bulk(bundled_data_list):
-#     print("Working on non-maximum suppression...")
-#     bundled_np_list = [
-#         nms_single(bundled_data) for bundled_data in tqdm(bundled_data_list)
-#     ]
-#     print("Finished non-maximum suppression!")
-#     return bundled_np_list
-
-
-# def neighbor_boxes(box1, box2, threshold=0.1):
-#     r"""This method returns whether two boxes are close enough.
-#     If two boxes from two neighboring frames are considered
-#     close enough, they are refered as the same object.
-#     """
-
-#     if math.abs(box1[0] - box2[0]) > threshold:
-#         return False
-#     if math.abs(box1[1] - box2[1]) > threshold:
-#         return False
-#     if math.abs(box1[2] - box2[2]) > threshold:
-#         return False
-#     if math.abs(box1[3] - box2[3]) > threshold:
-#         return False
-#     return True
-
-
-# def smooth_box(bundled_np_list, min_score_thresh=0.5):
-#     r"""If you knew which boxes in consecutive frames were the same object,
-#     you could "smooth" out of the box positions over time.
-#     For example, the box position at frame t could be the average of
-#     the positions in surrounding frames:
-#     box_t = (box_(t-1) + box_t + box_(t+1)) / 3
-#     """
-#     print("Working on making boxes smooth...")
-
-#     for i, now in enumerate(tqdm(bundled_np_list)):
-#         # Ignore the first and last frame
-#         if i == 0:
-#             before = None
-#             continue
-#         else:
-#             before = bundled_np_list[i - 1]
-
-#         if i == len(bundled_np_list) - 1:
-#             after = None
-#             continue
-#         else:
-#             after = bundled_np_list[i + 1]
-
-#         [boxes_after, classes_after, scores_after] = after
-#         [boxes_before, classes_before, scores_before] = before
-#         [boxes_now, classes_now, scores_now] = now
-
-#         for j, [box_now, class_now, score_now] in enumerate(
-#                 zip(boxes_now, classes_now, scores_now)):
-
-#             # Assume that the boxes list is already sorted
-#             if score_now < min_score_thresh:
-#                 break
-
-#             confirmed_box_after = None
-#             confirmed_box_before = None
-
-#             for k, [box_after, class_after, score_after] in enumerate(
-#                     zip(boxes_after, classes_after, scores_after)):
-#                 if (IoU(box_now, box_after) > 0.3 and
-#                     class_now == class_after and
-#                     score_after > min_score_thresh - 0.1):
-
-#                     confirmed_box_after = box_after
-#                     if score_after < min_score_thresh:
-#                         scores_after[k] = score_now
-#                     break
-
-#             for k, [box_before, class_before, score_before] in enumerate(
-#                     zip(boxes_before, classes_before, scores_before)):
-#                 if IoU(box_now,
-#                        box_before) > 0.3 and class_now == class_before:
-#                     confirmed_box_before = box_before
-#                     break
-
-#             if confirmed_box_before is not None and confirmed_box_after is not None:
-#                 box_now += box_now
-#                 box_now += confirmed_box_before
-#                 box_now += confirmed_box_after
-#                 box_now /= 4.0
-#             elif confirmed_box_before is not None:
-#                 box_now += confirmed_box_before
-#                 box_now /= 2.0
-#             elif confirmed_box_after is not None:
-#                 box_now += confirmed_box_after
-#                 box_now /= 2.0
-
-#             boxes_now[j] = box_now
-
-#         bundled_np_list[i] = [boxes_now, classes_now, scores_now]
-#         bundled_np_list[i + 1] = [boxes_after, classes_after, scores_after]
-#         bundled_np_list[i - 1] = [boxes_before, classes_before, scores_before]
-
-#     print("Finished making boxes smooth!")
-#     return bundled_np_list
 
 
 ##################################################################################################
@@ -323,12 +164,11 @@ class MaskRCNNDetectObjects(Kernel):
 ##################################################################################################
 # Mostly taken from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/demo/predictor.py
 
-@scannerpy.register_python_op(name='TorchDrawBoxes')
-def draw_boxes(config, frame: FrameType, bundled_data: bytes) -> FrameType:
-    min_score_thresh = config.args['min_score_thresh']
-    metadata = pickle.loads(bundled_data)
-    visualize_labels(frame, metadata, min_score_thresh)
-    return frame
+@scannerpy.register_python_op(name='DrawMaskRCNN')
+def draw_maskrcnn(config, frame: FrameType, bundled_data: Any) -> FrameType:
+    min_score_thresh = config.args.get('min_score_thresh', 0.7)
+    result = visualize_one_image(frame, bundled_data, min_score_thresh)
+    return result
 
 
 CATEGORIES = [
@@ -415,48 +255,57 @@ CATEGORIES = [
         "toothbrush",]
 
 
-def visualize_labels(image, metadata, min_score_thresh=0.5, mask_shrink=4):
+def visualize_one_image(image, metadata, min_score_thresh=0.7, blending_alpha=0.5):
+    if len(metadata) == 0:
+        return image
+    H, W = image.shape[:2]
     scores = [obj['score'] for obj in metadata]
-    boxes = [obj['bbox'] for obj in metadata]
-    masks = [obj['mask'] for obj in metadata]
+    boxes = [obj['bbox'] for obj in metadata] if 'bbox' in metadata[0] else [None] * len(metadata)
+    masks = [obj['mask'] for obj in metadata] if 'mask' in metadata[0] else [None] * len(metadata)
     labels = [obj['label'] for obj in metadata]
     colors = compute_colors_for_labels(labels).tolist()
-    labels = [CATEGORIES[i] for i in labels]
-    
+    labels = [CATEGORIES[int(i)] for i in labels]
+
+    result = image.copy()
     for score, box, mask, label, color in zip(scores, boxes, masks, labels, colors):
         if score < min_score_thresh:
             continue
+        # draw bbox 
+        if not box is None:  
+            if 'x1' in box:
+                top_left = (int(box['x1']*W), int(box['y1']*H)) 
+                bottom_right = (int(box['x2']*W), int(box['y2']*H))
+            else:
+                top_left = (int(box[0]*W), int(box[1]*H)) 
+                bottom_right = (int(box[2]*W), int(box[3]*H))
+            result = cv2.rectangle(result, top_left, bottom_right, tuple(color), 3)
 
-        # overlay bbox   
-        top_left = (box['x1'], box['y1'])
-        bottom_right = (box['x2'], box['y2'])
-        image = cv2.rectangle(
-            image, top_left, bottom_right, tuple(color), 3
-        )
+        if not mask is None:
+            mask = mask_util.decode([mask])[..., 0]
+            # overlay mask
+            for c in range(3):
+                result[:, :, c] = np.where(mask > 0,
+                                          result[:, :, c] * (1 - blending_alpha) + color[c] * blending_alpha,
+                                          result[:, :, c])
+        
+        # draw class name
+        if not box is None:
+            template = "{}: {:.2f}"
+            if 'x1' in box:
+                x, y = int(box['x1']*W), int(box['y1']*H)
+            else:
+                x, y = int(box[0]*W), int(box[1]*H)
+            s = template.format(label, score)
+            result = cv2.putText(result, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3)
 
-        # overlay mask contour
-        H, W =  mask.shape  
-        mask_large = cv2.resize(mask, (W * mask_shrink, H * mask_shrink))
-        thresh = (mask_large[..., None] > 0).astype(np.uint8) 
-        contours, hierarchy = cv2_util.findContours(
-            thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-        )
-        image = cv2.drawContours(image, contours, -1, color, 3)
-
-        # overlap class name
-        template = "{}: {:.2f}"
-        x, y = box['x1'], box['y1']
-        s = template.format(label, score)
-        cv2.putText(
-            image, s, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3
-        )
+    return result
 
 
 def compute_colors_for_labels(labels):
     """
     Simple function that adds fixed colors depending on the class
     """
-    palette = np.array([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    palette = np.array([2 ** 21 - 1, 2 ** 15 - 1, 2 ** 25 - 1])
     colors = np.array(labels)[:, None] * palette
     colors = (colors % 255).astype("uint8")
     return colors
