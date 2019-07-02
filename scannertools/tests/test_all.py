@@ -8,6 +8,7 @@ import scannertools.misc
 import scannertools.storage
 import scannertools.face_detection
 import scannertools.maskrcnn_detection
+import scannertools.densepose_detection
 import tempfile
 import json
 from scannerpy import CacheMode, DeviceType, protobufs, NamedStream, NamedVideoStream, PerfParams

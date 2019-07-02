@@ -19,6 +19,13 @@ ENV PYTHONPATH /opt/facenet/src:/opt/rude-carnie:$PYTHONPATH
 RUN pip3 install torchvision_nightly
 RUN pip3 install torch_nightly -f https://download.pytorch.org/whl/nightly/cu90/torch_nightly.html
 
+# Install cocoapi
+RUN git clone https://github.com/scanner-research/cocoapi.git \
+ && cd cocoapi/PythonAPI \
+ && pip3 install Cython \
+ && python3 setup.py build_ext install \
+ && rm -rf build
+
 # Install maskrcnn dependencies
 RUN git clone https://www.github.com/nvidia/apex && \
     cd apex && pip3 install . && cd .. && rm -rf apex
@@ -32,12 +39,8 @@ RUN git clone https://github.com/facebookresearch/maskrcnn-benchmark.git \
  && python3 setup.py build develop
 ENV PYTHONPATH /opt/maskrcnn-benchmark:$PYTHONPATH
 
-# Install cocoapi
-RUN git clone https://github.com/scanner-research/cocoapi.git \
- && cd cocoapi/PythonAPI \
- && pip3 install Cython \
- && python3 setup.py build_ext install \
- && rm -rf build
+# Install DensePose dependencies
+RUN pip3 install future
 
 # Install DensePose
 RUN git clone -b python3 https://github.com/scanner-research/DensePose.git \
